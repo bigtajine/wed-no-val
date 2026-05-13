@@ -21,10 +21,12 @@ Stock WED ties export to passing validation for good reasons (sim quality, Gatew
 
 ## Why this fork exists (short)
 
-Designers have discussed for years that **validation got stricter over time**, so airports that once exported can **fail today** with draped-polygon, taxi-network, winding, and other errors unrelated to a quick fix. There is **no** official “ignore validation and export anyway” switch in stock WED. Community thread (context and workarounds):  
+Some designers may occasionally run into situations where WED validation has become stricter over time, meaning that airports which previously exported successfully can now fail due to checks such as draped polygons, taxi network issues, winding errors, or other validations that are not always directly related to the specific edit being made. Stock WED does not provide an option to bypass validation during export.
+
+For additional context and discussion, see:
 [“Why do I always get Validation Errors when editing in WED?”](https://forums.x-plane.org/forums/topic/194923-wed-how-to-ignore-deal-with-warnings/) (X-Plane.org Scenery Development Forum).
 
-**Typical use case here:** delete or adjust a few items in existing scenery and re-export **without** rework of the whole airport. For **serious airport work** where you want the full checker, use a **validation-enabled** build (see **Building.md**).
+This build is intended for **small edits** to existing scenery (for example removing or moving a few objects) when you want to **re-export without fixing every validation issue** across the whole airport. For **serious airport work** where you want the full checker, use a build with **validation enabled**; for **official publication** tooling, use **stock upstream WED** (see **[Building.md](Building.md)**).
 
 ---
 
@@ -33,12 +35,11 @@ Designers have discussed for years that **validation got stricter over time**, s
 ### 2.6.1-no-val (fork)
 
 - **Optional validation bypass (CMake):** `-DWED_NO_VALIDATION=ON` in `cmake/WED.cmake`. When enabled, `WED_ValidateApt` in `src/WEDCore/WED_Validate.cpp` returns **clean immediately** so the Validate menu path and pre-export validation do not block you with the full rule set.
-- **Optional no-Gateway-export build (CMake):** `-DWED_NO_GATEWAY=ON` (see `cmake/WED.cmake`, `src/Obj/WED_NoGatewayOverrides.h`). Removes the **Airport Scenery Gateway** export target and the **pack-upload** UI path; **import from Gateway stays available**. **Slippy map / file cache / metadata CSV** still use HTTP via `curl_http` (not tied to `HAS_GATEWAY_EXPORT`).
-- **Branding / credits:** Version string **2.6.1-no-val**; maintainer line **bigtajine** in About, startup screen, Windows `WED.rc` **Comments**, and macOS `WED_Info.plist`.
+- **Optional no-Gateway-export build (CMake):** `-DWED_NO_GATEWAY=ON` (see `cmake/WED.cmake`, `src/Obj/WED_NoGatewayOverrides.h`). Removes the **Airport Scenery Gateway** export target and **pack-upload** UI; **import from Gateway stays available**. Slippy map, file cache, and metadata CSV still use HTTP via `curl_http`.
 - **Editor performance (`WED_Map`):** Single combined DFS for layers that draw both structure and visualization (`DrawVisStrFor` in `src/WEDMap/WED_Map.cpp` / `WED_Map.h`) to avoid walking the same hierarchy twice on large sceneries.
 - **UI responsiveness:** Throttled hover refresh on mouse move (`kHoverMouseMoveRefreshMs` in `WED_Map.cpp`).
 - **Cull behavior:** Adjusted `TOO_SMALL_TO_GO_IN` handling so huge airports skip deeper recursion a bit more aggressively when zoomed out (less wasted work for off-screen detail).
-- **Build system:** `cmake.ps1` / `cmake.sh` and documentation updated for **Conan 2** + **CMake** workflow (see Building.md).
+- **Build system:** `cmake.ps1` / `cmake.sh` and documentation updated for **Conan 2** + **CMake** workflow (see **[Building.md](Building.md)**).
 - **Misc.:** Small local edits elsewhere in the tree (e.g. `GUI_Fonts`, `WED_VertexTool`); use `git log` / `git diff` against your base branch for line-by-line history.
 
 ---
@@ -56,7 +57,7 @@ Prerequisites: **CMake**, **Conan 2**, **Visual Studio 2022** (Windows) or Xcode
 | **`WED_NO_VALIDATION=ON`** | `WED_ValidateApt` succeeds immediately; Validate menu and pre-export checks do not run the full rule set. |
 | **`WED_NO_GATEWAY=ON`** | **Export-side only:** removes the **Airport Scenery Gateway** export target and **pack-upload** UI; **`HAS_GATEWAY_EXPORT`** is forced off via `src/Obj/WED_NoGatewayOverrides.h`. **Import from Gateway stays on** (`HAS_GATEWAY` unchanged). |
 
-Details and tradeoffs: **[Building.md](Building.md)**. Compile-time defaults and overrides: **`src/Obj/XDefs.h`**.
+Details and tradeoffs: **[Building.md](Building.md)**. Compile-time defaults and overrides: `src/Obj/XDefs.h`.
 
 ### Windows (from repo root)
 
@@ -71,16 +72,16 @@ cmake --build vs_build --config Release --target WED
 
 ### Second build directory (side-by-side binaries)
 
-After `.\cmake.ps1` has run once so Conan’s **`vs_build\build\generators\conan_toolchain.cmake`** exists, you can configure a **separate** tree (e.g. `vs_build_novalid`) if you want both a stock-like and a no-val binary:
+After **`.\cmake.ps1`** has run once, Conan writes **`vs_build\build\generators\conan_toolchain.cmake`**. You can point a **second** build folder at that file so two trees keep different CMake flags (for example `vs_build` vs `vs_build_novalid`):
 
 ```powershell
-cmake -S . -B vs_build_novalid -DCMAKE_TOOLCHAIN_FILE=vs_build/build/generators/conan_toolchain.cmake -DWED_NO_VALIDATION=ON -DWED_NO_GATEWAY=ON
+cmake -S . -B vs_build_novalid -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE=vs_build/build/generators/conan_toolchain.cmake -DWED_NO_VALIDATION=ON -DWED_NO_GATEWAY=ON
 cmake --build vs_build_novalid --config Release --target WED
 ```
 
-Release output (default layout): **`vs_build\Release\WED.exe`** (or your chosen build dir).
+Each build directory produces its own **`Release\WED.exe`** under that folder (for example **`vs_build\Release\WED.exe`** or **`vs_build_novalid\Release\WED.exe`**).
 
-**macOS / Linux:** Use **`cmake.sh`** or the CMake commands in **[Building.md](Building.md)**; pass the same **`WED_NO_VALIDATION`** / **`WED_NO_GATEWAY`** defines on configure, then build your chosen target.
+**macOS / Linux:** Use **`cmake.sh`** or the flow in **[Building.md](Building.md)**; pass the same **`WED_NO_VALIDATION`** / **`WED_NO_GATEWAY`** defines on **configure**, then build your target.
 
 ---
 
@@ -89,9 +90,9 @@ Release output (default layout): **`vs_build\Release\WED.exe`** (or your chosen 
 | Problem | What to do |
 | --- | --- |
 | **Link error `LNK1104` / cannot open `WED.exe`** | Exit **WorldEditor** (and any duplicate `WED.exe` processes) so the linker can overwrite the executable. |
-| **Wrong binary (validation on vs off)** | Use two directories (e.g. `vs_build` vs `vs_build_novalid`) and check which one you launch; the **no-val** label in About matches `WED_NO_VALIDATION` builds only if you built with that flag. |
+| **Wrong binary (features don’t match what you expected)** | Use **one build directory per CMake configure** and launch **`Release\WED.exe`** from that same tree; re-run **`cmake.ps1`** or **`cmake -S -B …`** after changing `-D` flags, then rebuild. The About **no-val** label only indicates **`WED_NO_VALIDATION`**; confirm **`WED_NO_GATEWAY`** (or other flags) separately in your build log or `CMakeCache.txt`. |
 | **Wrong WED.exe (feature mix)** | Match the folder you built from (`vs_build` vs `vs_build_novalid`, etc.); this fork’s **no-val** packages are intended to ship with **`WED_NO_GATEWAY=ON`**. |
-| **CMake / Conan errors** | See **Building.md** (CMake 3.x vs 4.x note, `conan profile detect`, toolchain path). |
+| **CMake / Conan errors** | See **[Building.md](Building.md)** (CMake 3.x vs 4.x note, `conan profile detect`, toolchain path). |
 
 ---
 
