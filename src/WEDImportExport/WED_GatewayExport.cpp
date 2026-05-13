@@ -333,9 +333,6 @@ public:
 
 private:
 
-	//Used for downloading the airport metadata defaults
-	RAII_CurlHandle*        mAirportMetadataCURLHandle;
-
 	//The airport we are attempting to upload
 	WED_Airport*			mApt;
 
@@ -479,7 +476,6 @@ static string InterpretNetworkError(curl_http_get_file* curl)
 
 WED_GatewayExportDialog::WED_GatewayExportDialog(WED_Airport * apt, WED_Document * resolver) :
 	GUI_FormWindow(gApplication, "Airport Scenery Gateway", 500, 400),
-	mAirportMetadataCURLHandle(NULL),
 	mApt(apt),
 	mCurl(NULL),
 	mPhase(expt_dialog_download_airport_metadata),
@@ -768,21 +764,30 @@ void WED_GatewayExportDialog::TimerFired()
 	if(mPhase == expt_dialog_download_airport_metadata)
 	{
 		WED_file_cache_response res = gFileCache.request_file(mCacheRequest);
-		if(res.out_status != cache_status_downloading)
-		{
-			Stop();
+		if(res.out_status == cache_status_downloading)
+			return;
 
-			if(res.out_status == cache_status_available)
-			{
-				WED_GatewayExportDialog::mAirportMetadataCSVPath = res.out_path;
-				mPhase = expt_dialog_upload_to_gateway;
-				this->AddLabel("Airport metadata defaults have been downloaded succesfully.");
-			}
-			else if(res.out_status == cache_status_error)
-			{
-				mPhase = expt_dialog_done;
-				this->AddLabel(InterpretNetworkError(&this->mAirportMetadataCURLHandle->get_curl_handle()));
-			}
+		if(res.out_status == cache_status_cooling)
+			return;
+
+		Stop();
+
+		if(res.out_status == cache_status_available)
+		{
+			WED_GatewayExportDialog::mAirportMetadataCSVPath = res.out_path;
+			mPhase = expt_dialog_upload_to_gateway;
+			this->AddLabel("Airport metadata defaults have been downloaded succesfully.");
+		}
+		else if(res.out_status == cache_status_error)
+		{
+			mPhase = expt_dialog_done;
+			string err = res.out_error_human.empty() ? string("Metadata download failed.") : res.out_error_human;
+			this->AddLabel(err);
+		}
+		else
+		{
+			mPhase = expt_dialog_done;
+			this->AddLabel("Metadata download failed (unexpected cache state).");
 		}
 		return;
 	}

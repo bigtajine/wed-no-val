@@ -245,6 +245,18 @@ curl_http_get_file::thread_proc(void * param)
 	
 	CURL *	curl = curl_easy_init();
 
+	/*
+	 * Conan libcurl on Windows (OpenSSL) often has no usable CA bundle path, which yields
+	 * "SSL peer certificate not ok" / CURLE_PEER_FAILED_VERIFICATION for https:// URLs.
+	 * Prefer the OS certificate store where libcurl supports it (Windows, macOS).
+	 */
+#if defined(CURLSSLOPT_NATIVE_CA)
+	{
+		long sslopts = CURLSSLOPT_NATIVE_CA;
+		curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, sslopts);
+	}
+#endif
+
 	curl_easy_setopt(curl, CURLOPT_URL, me->m_url.c_str());
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, true);	// Required because we do a redirect to protect against URL/Server changes breaking URLs
 	curl_easy_setopt(curl, CURLOPT_REFERER, "https://developer.x-plane.com/tools/worldeditor/");

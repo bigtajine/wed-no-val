@@ -24,7 +24,6 @@
 #include "XDefs.h"
 #include "WED_GatewayExport.h"
 
-#include <sstream>
 #include <fstream>
 
 #include "FileUtils.h"
@@ -33,14 +32,15 @@
 #include "GUI_Resources.h"
 #include "GUI_Timer.h"
 #include "PlatformUtils.h"
-#include "RAII_Classes.h"
 #include "WED_FileCache.h"
 #include "WED_MetaDataDefaults.h"
 #include "WED_Url.h"
-#include "curl/curl.h"
 #include "WED_Airport.h"
 #include "ILibrarian.h"
 #include "WED_ToolUtils.h"
+
+#include <chrono>
+#include <thread>
 
 /**
  * @return true if we succeeded; false if there was a catastrophic error about which we alerted the user
@@ -83,9 +83,6 @@ public:
 	static const string& GetAirportMetadataCSVPath();
 
 private:
-	//Used for downloading the airport metadata defaults
-	RAII_CurlHandle*        mAirportMetadataCURLHandle;
-
 	//Where the airport metadata csv file was ultimately downloaded to
 	static string           mAirportMetadataCSVPath;
 
@@ -133,51 +130,8 @@ void WED_DoUpdateMetadata(IResolver * resolver)
 	new WED_UpdateMetadataDialog(apt, resolver);
 }
 
-static string InterpretNetworkError(curl_http_get_file* curl)
-{
-	int err = curl->get_error();
-	bool bad_net = curl->is_net_fail();
-
-	stringstream ss;
-			
-	if(err <= CURL_LAST)
-	{
-		string msg = curl_easy_strerror((CURLcode) err);
-		ss << "Upload failed: " << msg << ". (" << err << ")";
-
-		if(bad_net) ss << "\n(Please check your internet connectivity.)";
-	}
-	else if(err >= 100)
-	{
-		ss << "Upload failed.  The server returned error " << err << ".";
-				
-		vector<char>	errdat;
-		curl->get_error_data(errdat);
-		bool is_ok = !errdat.empty();
-		for(vector<char>::iterator i = errdat.begin(); i != errdat.end(); ++i)
-		if(!isprint(*i))
-		{
-			is_ok = false;
-			break;
-		}
-				
-		if(is_ok)
-		{
-			string errmsg = string(errdat.begin(),errdat.end());
-			ss << "\n" << errmsg;
-		}
-	}
-	else
-	{
-		ss << "Upload failed due to unknown error: " << err << ".";
-	}
-
-	return ss.str();
-}
-
 WED_UpdateMetadataDialog::WED_UpdateMetadataDialog(WED_Airport * apt, IResolver * resolver) : 
 	GUI_FormWindow(gApplication, "Update Airport Metadata", 450, 150),
-	mAirportMetadataCURLHandle(NULL),
 	mApt(apt),
 	mPhase(update_dialog_download_airport_metadata),
 	mResolver(resolver)
@@ -240,34 +194,45 @@ void WED_UpdateMetadataDialog::Submit()
 
 void WED_UpdateMetadataDialog::TimerFired()
 {
-	if(mPhase == update_dialog_download_airport_metadata)
-	{
-		WED_file_cache_response res = gFileCache.request_file(mCacheRequest);
-		if(res.out_status != cache_status_downloading)
-		{
-			Stop();
-			
-			if(res.out_status == cache_status_available)
-			{
-				WED_UpdateMetadataDialog::mAirportMetadataCSVPath = res.out_path;
-				mPhase = update_dialog_waiting;
-				this->Reset("","OK","Cancel", true);
-				
-				string icao;
-				mApt->GetICAO(icao);
-				this->AddLabel("Update metadata for the airport " + icao + "?");
-				this->AddLabel("(Adds new metadata if available, will not overwrite existing values)");
-			}
-			else if(res.out_status == cache_status_error)
-			{
-				string err = InterpretNetworkError(&this->mAirportMetadataCURLHandle->get_curl_handle());
-				LOG_MSG("E/MDU Metadata update failed due to error '%s'\n", err.c_str());
-				mPhase = update_dialog_done;
-				this->Reset("","","Exit",true);
-				this->AddLabel(err);
-			}
-		}
+	if(mPhase != update_dialog_download_airport_metadata)
 		return;
+
+	WED_file_cache_response res = gFileCache.request_file(mCacheRequest);
+
+	if(res.out_status == cache_status_downloading)
+		return;
+
+	/* Cooling: keep timer running; do not Stop() or the dialog never polls again. */
+	if(res.out_status == cache_status_cooling)
+		return;
+
+	Stop();
+
+	if(res.out_status == cache_status_available)
+	{
+		WED_UpdateMetadataDialog::mAirportMetadataCSVPath = res.out_path;
+		mPhase = update_dialog_waiting;
+		this->Reset("","OK","Cancel", true);
+
+		string icao;
+		mApt->GetICAO(icao);
+		this->AddLabel("Update metadata for the airport " + icao + "?");
+		this->AddLabel("(Adds new metadata if available, will not overwrite existing values)");
+	}
+	else if(res.out_status == cache_status_error)
+	{
+		string err = res.out_error_human.empty() ? string("Metadata download failed.") : res.out_error_human;
+		LOG_MSG("E/MDU Metadata update failed due to error '%s'\n", err.c_str());
+		mPhase = update_dialog_done;
+		this->Reset("","","Exit",true);
+		this->AddLabel(err);
+	}
+	else
+	{
+		LOG_MSG("E/MDU Metadata update: unexpected cache status %d\n", (int)res.out_status);
+		mPhase = update_dialog_done;
+		this->Reset("","","Exit",true);
+		this->AddLabel("Metadata download failed (unexpected cache state).");
 	}
 }
 //---------------------------------------------------------------------------//
@@ -281,9 +246,10 @@ void	WED_DoInvisibleUpdateMetadata(WED_Airport * apt)
 		if(cache_filled_successfully)
 		{
 			WED_file_cache_response res = gFileCache.request_file(cache_request);
-			while(res.out_status == cache_status_downloading)
+			while(res.out_status == cache_status_downloading || res.out_status == cache_status_cooling)
 			{
-				// Synchronously download the file (or grab it from disk)
+				if(res.out_status == cache_status_cooling)
+					std::this_thread::sleep_for(std::chrono::milliseconds(250));
 				res = gFileCache.request_file(cache_request);
 			}
 

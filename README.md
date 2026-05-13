@@ -11,7 +11,7 @@ Full build steps, CMake details, and a longer discussion of validation tradeoffs
 | | |
 | --- | --- |
 | **Upstream project** | [X-Plane / xptools](https://github.com/X-Plane/xptools) — Laminar Research scenery tools (WorldEditor, DSF tools, etc.). |
-| **This fork** | Maintained by **bigtajine**. Focus: **optional compile-time validation bypass** for WED (`WED_NO_VALIDATION`), **optional builds that omit Gateway export and pack-upload UI** (`WED_NO_GATEWAY` — import from Gateway unchanged), **map/editor performance** tweaks, **build/docs** (Conan 2 + CMake), and a clear **version label** so binaries are not confused with stock WED. |
+| **This fork** | Maintained by **bigtajine**. Focus: **optional compile-time validation bypass** for WED (`WED_NO_VALIDATION`), **optional builds that omit Gateway export and pack-upload UI** (`WED_NO_GATEWAY` — import from Gateway unchanged), **HTTPS downloads that work with Conan libcurl on Windows** (native OS CA store in `curl_http`), **map/editor performance** tweaks, **build/docs** (Conan 2 + CMake), and a clear **version label** so binaries are not confused with stock WED. |
 | **Version label** | **2.6.1-no-val** (see `src/WEDCore/WED_Version.h`). The **`-no-val`** suffix flags that this tree is intended to support **no-validation** builds; it is **not** an official Laminar version number. |
 | **Affiliation** | This fork is **community-maintained** and is **not** officially affiliated with **Laminar Research**, the **Airport Scenery Gateway**, or the owners of the upstream GitHub repository. |
 
@@ -36,6 +36,8 @@ This build is intended for **small edits** to existing scenery (for example remo
 
 - **Optional validation bypass (CMake):** `-DWED_NO_VALIDATION=ON` in `cmake/WED.cmake`. When enabled, `WED_ValidateApt` in `src/WEDCore/WED_Validate.cpp` returns **clean immediately** so the Validate menu path and pre-export validation do not block you with the full rule set.
 - **Optional no-Gateway-export build (CMake):** `-DWED_NO_GATEWAY=ON` (see `cmake/WED.cmake`, `src/Obj/WED_NoGatewayOverrides.h`). Removes the **Airport Scenery Gateway** export target and **pack-upload** UI; **import from Gateway stays available**. Slippy map, file cache, and metadata CSV still use HTTP via `curl_http`.
+- **HTTPS / libcurl (Windows and macOS):** `src/Network/curl_http.cpp` enables **`CURLSSLOPT_NATIVE_CA`** when available so TLS uses the **operating system certificate store**. That avoids the common Conan **OpenSSL** symptom **“SSL peer certificate not ok”** when downloading metadata, tiles, and other `https://` URLs without a bundled CA file.
+- **Update Airport Metadata:** `src/WEDImportExport/WED_MetadataUpdate.cpp` reports file-cache errors correctly and no longer stops the timer during cache **cool-down**, so the metadata CSV flow can finish instead of hanging after a transient failure.
 - **Editor performance (`WED_Map`):** Single combined DFS for layers that draw both structure and visualization (`DrawVisStrFor` in `src/WEDMap/WED_Map.cpp` / `WED_Map.h`) to avoid walking the same hierarchy twice on large sceneries.
 - **UI responsiveness:** Throttled hover refresh on mouse move (`kHoverMouseMoveRefreshMs` in `WED_Map.cpp`).
 - **Cull behavior:** Adjusted `TOO_SMALL_TO_GO_IN` handling so huge airports skip deeper recursion a bit more aggressively when zoomed out (less wasted work for off-screen detail).
@@ -90,8 +92,8 @@ Each build directory produces its own **`Release\WED.exe`** under that folder (f
 | Problem | What to do |
 | --- | --- |
 | **Link error `LNK1104` / cannot open `WED.exe`** | Exit **WorldEditor** (and any duplicate `WED.exe` processes) so the linker can overwrite the executable. |
-| **Wrong binary (features don’t match what you expected)** | Use **one build directory per CMake configure** and launch **`Release\WED.exe`** from that same tree; re-run **`cmake.ps1`** or **`cmake -S -B …`** after changing `-D` flags, then rebuild. The About **no-val** label only indicates **`WED_NO_VALIDATION`**; confirm **`WED_NO_GATEWAY`** (or other flags) separately in your build log or `CMakeCache.txt`. |
-| **Wrong WED.exe (feature mix)** | Match the folder you built from (`vs_build` vs `vs_build_novalid`, etc.); this fork’s **no-val** packages are intended to ship with **`WED_NO_GATEWAY=ON`**. |
+| **Wrong binary / feature flags** | Use **one build directory per CMake configure** and launch **`Release\WED.exe`** from that tree; re-run **`cmake.ps1`** or **`cmake -S -B …`** after changing `-D` flags, then rebuild. The About **no-val** label reflects **`WED_NO_VALIDATION`** only—confirm **`WED_NO_GATEWAY`** (and other options) in your build log or **`CMakeCache.txt`**. This fork’s **no-val** packages are intended to ship with **`WED_NO_GATEWAY=ON`**. |
+| **HTTPS errors (“SSL peer certificate not ok”)** | Use a **fresh build** of this fork (native OS CA for libcurl). If errors persist, the network may be doing **TLS inspection** (proxy/antivirus) with a **custom root**—trust that root in the OS store or fix the proxy; that situation is environmental, not an airport-metadata bug. |
 | **CMake / Conan errors** | See **[Building.md](Building.md)** (CMake 3.x vs 4.x note, `conan profile detect`, toolchain path). |
 
 ---
