@@ -33,7 +33,6 @@ Designers have discussed for years that **validation got stricter over time**, s
 ### 2.6.1-no-val (fork)
 
 - **Optional validation bypass (CMake):** `-DWED_NO_VALIDATION=ON` in `cmake/WED.cmake`. When enabled, `WED_ValidateApt` in `src/WEDCore/WED_Validate.cpp` returns **clean immediately** so the Validate menu path and pre-export validation do not block you with the full rule set.
-- **Branding / credits:** Version string **2.6.1-no-val**; maintainer line **bigtajine** in About, startup screen, Windows `WED.rc` **Comments**, and macOS `WED_Info.plist`.
 - **Editor performance (`WED_Map`):** Single combined DFS for layers that draw both structure and visualization (`DrawVisStrFor` in `src/WEDMap/WED_Map.cpp` / `WED_Map.h`) to avoid walking the same hierarchy twice on large sceneries.
 - **UI responsiveness:** Throttled hover refresh on mouse move (`kHoverMouseMoveRefreshMs` in `WED_Map.cpp`).
 - **Cull behavior:** Adjusted `TOO_SMALL_TO_GO_IN` handling so huge airports skip deeper recursion a bit more aggressively when zoomed out (less wasted work for off-screen detail).
