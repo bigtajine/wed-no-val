@@ -21,10 +21,12 @@ Stock WED ties export to passing validation for good reasons (sim quality, Gatew
 
 ## Why this fork exists (short)
 
-Designers have discussed for years that **validation got stricter over time**, so airports that once exported can **fail today** with draped-polygon, taxi-network, winding, and other errors unrelated to a quick fix. There is **no** official “ignore validation and export anyway” switch in stock WED. Community thread (context and workarounds):  
+Some designers may occasionally run into situations where WED validation has become stricter over time, meaning that airports which previously exported successfully can now fail due to checks such as draped polygons, taxi network issues, winding errors, or other validations that are not always directly related to the specific edit being made. Stock WED does not provide an option to bypass validation during export.
+
+For additional context and discussion, see:
 [“Why do I always get Validation Errors when editing in WED?”](https://forums.x-plane.org/forums/topic/194923-wed-how-to-ignore-deal-with-warnings/) (X-Plane.org Scenery Development Forum).
 
-**Typical use case here:** delete or adjust a few items in existing scenery and re-export **without** rework of the whole airport. **Not** the right tool choice for careless Gateway submissions: use a **validation-enabled** build when you need the checker.
+This build is intended for those edge cases where small adjustments are made to existing scenery (for example, removing or adjusting a few objects) and a quick re-export is needed without a full rebuild of the airport. It is not intended for Gateway submissions or full airport development, where a standard validation-enabled workflow should be used.
 
 ---
 
