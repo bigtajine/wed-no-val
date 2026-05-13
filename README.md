@@ -1,60 +1,109 @@
-X-Plane Scenery Tools README
-====================================================================
+# XPTools / WorldEditor (WED) — bigtajine fork (`2.6.1-no-val`)
 
-The X-Plane Scenery Tools (XPTools) code base is the source code tree for all 
-of the Laminar Research scenery creation/editing tools. This does not 
-include X-Plane, Plane Maker, or Airfoil Maker.  It does include source to WorldEditor (WED),
-and our global scenery generator RenderFarm, and other tools.
+This repository is the **X-Plane scenery tools (XPTools)** source tree: WorldEditor (WED), DSFTools, XGrinder, and related utilities. **This copy is a community fork** whose main practical goal is an **optional WorldEditor build that does not run airport/scenery validation**, so you can open messy third-party packages, make **small edits** (for example **delete objects**), and **export** without being forced to fix unrelated validation errors first.
 
-**Fork note (this copy of the repo):** WorldEditor here is maintained as **bigtajine**’s **2.6.1-no-val** fork. The main addition is an **optional build** (`WED_NO_VALIDATION=ON`) that **skips validation** so you can re-export after small edits (for example removing objects) without fixing every legacy error. That is **not** suitable for Gateway-quality work on its own; see **[Building.md](Building.md)** for rationale (including a link to the X-Plane.org discussion on validation), tradeoffs, and a **changelog**.
+Full build steps, CMake details, and a longer discussion of validation tradeoffs are in **[Building.md](Building.md)**.
 
-Contents
--------------------------------------------------------------------------------
+---
 
-- [Licensing and Copyright](#licensing-and-copyright)
-- [Building the Applications](#building-the-applications)
-- [Contributing Using Git & GitHub](#contributing-using-git--github)
-- [Top Level File Structure](#top-level-file-structure)
-- [Documentation](#documentation)
-- [Mailing List/Contact](#mailing-listcontact)
+## Fork status
 
-Licensing and Copyright
--------------------------------------------------------------------------------
+| | |
+| --- | --- |
+| **Upstream project** | [X-Plane / xptools](https://github.com/X-Plane/xptools) — Laminar Research scenery tools (WorldEditor, DSF tools, etc.). |
+| **This fork** | Maintained by **bigtajine**. Focus: **optional compile-time validation bypass** for WED (`WED_NO_VALIDATION`), **map/editor performance** tweaks, **build/docs** (Conan 2 + CMake), and a clear **version label** so binaries are not confused with stock WED. |
+| **Version label** | **2.6.1-no-val** (see `src/WEDCore/WED_Version.h`). The **`-no-val`** suffix flags that this tree is intended to support **no-validation** builds; it is **not** an official Laminar version number. |
+| **Affiliation** | This fork is **community-maintained** and is **not** officially affiliated with **Laminar Research**, the **Airport Scenery Gateway**, or the owners of the upstream GitHub repository. |
 
-The code original to Laminar Research lives in the sub-directory "src" and is licensed
-under the MIT/X11 license.  If you find a source file with no copyright, or double/conflicting
-copyright, please report this (see contact info below)—this is probably a clerical error.
+Stock WED ties export to passing validation for good reasons (sim quality, Gateway rules). This fork adds a **deliberate escape hatch at build time** for workflows where that policy is disproportionate to the edit you are making.
 
-[Building the Applications](Building.md)
--------------------------------------------------------------------------------
+---
 
-See [Building.md](Building.md) for setup, build instructions, and dev environment setup.
+## Why this fork exists (short)
 
-We do our best to keep `master` building all projects and in general be release-ready,
-but to get a stable release, use a tag associated with some kind of beta or release milestone.
+Designers have discussed for years that **validation got stricter over time**, so airports that once exported can **fail today** with draped-polygon, taxi-network, winding, and other errors unrelated to a quick fix. There is **no** official “ignore validation and export anyway” switch in stock WED. Community thread (context and workarounds):  
+[“Why do I always get Validation Errors when editing in WED?”](https://forums.x-plane.org/forums/topic/194923-wed-how-to-ignore-deal-with-warnings/) (X-Plane.org Scenery Development Forum).
 
+**Typical use case here:** delete or adjust a few items in existing scenery and re-export **without** rework of the whole airport. **Not** the right tool choice for careless Gateway submissions: use a **validation-enabled** build when you need the checker.
 
-Contributing Using Git & GitHub
--------------------------------------------------------------------------------
+---
 
-If you’d like to contribute to the project, you can do so by forking the repo on GitHub and making a pull request. (If you’re new to Git or GitHub, have a look at [the GitHub guides](https://guides.github.com), especially “Hello World” and the Git Handbook.)
+## Recent changes
 
-In general, the repo’s `master` branch reflects the current state of development, while release branches are used for staging and patching binary releases (so, for instance, `wed_230_release` is the release branch for WED version 2.3). There are also corresponding tags for public releases (e.g., `wed_231r1`).
+### 2.6.1-no-val (fork)
 
-Starting a new development branch based on the tip of `master` is probably a good idea to avoid merge conflicts. I encourage the use of `git rebase` after pulling new changes and updating the master branch to have your local development branch up-to-date, unless you have people pulling from your repository. In that case, merging `master` back to your development branch is a better choice because rebasing causes the creation of new commits with new SHA1 checksums which might distort the workflow of users pulling from your repository.
+- **Optional validation bypass (CMake):** `-DWED_NO_VALIDATION=ON` in `cmake/WED.cmake`. When enabled, `WED_ValidateApt` in `src/WEDCore/WED_Validate.cpp` returns **clean immediately** so the Validate menu path and pre-export validation do not block you with the full rule set.
+- **Branding / credits:** Version string **2.6.1-no-val**; maintainer line **bigtajine** in About, startup screen, Windows `WED.rc` **Comments**, and macOS `WED_Info.plist`.
+- **Editor performance (`WED_Map`):** Single combined DFS for layers that draw both structure and visualization (`DrawVisStrFor` in `src/WEDMap/WED_Map.cpp` / `WED_Map.h`) to avoid walking the same hierarchy twice on large sceneries.
+- **UI responsiveness:** Throttled hover refresh on mouse move (`kHoverMouseMoveRefreshMs` in `WED_Map.cpp`).
+- **Cull behavior:** Adjusted `TOO_SMALL_TO_GO_IN` handling so huge airports skip deeper recursion a bit more aggressively when zoomed out (less wasted work for off-screen detail).
+- **Build system:** `cmake.ps1` / `cmake.sh` and documentation updated for **Conan 2** + **CMake** workflow (see Building.md).
+- **Misc.:** Small local edits elsewhere in the tree (e.g. `GUI_Fonts`, `WED_VertexTool`); use `git log` / `git diff` against your base branch for line-by-line history.
 
-Once you’ve finished your work and you think it’s time to submit your changes, you can use the GitHub UI to submit a pull request.
+---
 
-Top Level File Structure
--------------------------------------------------------------------------------
+## Building (quick)
 
-- cmake
-    - All cmake scripts to build the various tools 
-- src
-    - The main source tree for the various tools and executable of XPTools.
-- test
-    - Collection of files for regression testing of WED
-- scripts
-    - A collection of scripts we use to package distros, and other things.
-- SDK
-    - The SDK for X-Plane
+Prerequisites: **CMake**, **Conan 2**, **Visual Studio 2022** (Windows) or Xcode / Ninja + compiler (macOS / Linux). See **[Building.md](Building.md)** for full environment notes.
+
+**Windows (from repo root):**
+
+```powershell
+.\cmake.ps1 -BuildType Release
+cmake --build vs_build --config Release --target WED
+```
+
+**WorldEditor with validation disabled** (after `.\cmake.ps1` has run once so Conan’s `conan_toolchain.cmake` exists under `vs_build\build\generators\`; use a **separate** build directory if you want both binaries):
+
+```powershell
+cmake -S . -B vs_build_novalid -DCMAKE_TOOLCHAIN_FILE=vs_build/build/generators/conan_toolchain.cmake -DWED_NO_VALIDATION=ON
+cmake --build vs_build_novalid --config Release --target WED
+```
+
+Release output (default layout): `vs_build\Release\WED.exe` (or your chosen build dir).
+
+---
+
+## Troubleshooting
+
+| Problem | What to do |
+| --- | --- |
+| **Link error `LNK1104` / cannot open `WED.exe`** | Exit **WorldEditor** (and any duplicate `WED.exe` processes) so the linker can overwrite the executable. |
+| **Wrong binary (validation on vs off)** | Use two directories (e.g. `vs_build` vs `vs_build_novalid`) and check which one you launch; the **no-val** label in About matches `WED_NO_VALIDATION` builds only if you built with that flag. |
+| **CMake / Conan errors** | See **Building.md** (CMake 3.x vs 4.x note, `conan profile detect`, toolchain path). |
+
+---
+
+## Original upstream README (condensed)
+
+The **X-Plane Scenery Tools** codebase is the source for Laminar’s scenery creation and editing tools. It does **not** include X-Plane, Plane Maker, or Airfoil Maker. It **does** include **WorldEditor (WED)** and other tools (e.g. DSFTools, XGrinder, packaging scripts).
+
+Official clone (upstream):
+
+```text
+git clone https://github.com/X-Plane/xptools.git
+```
+
+Upstream generally aims for `master` to build; for stable binaries, prefer **release tags** on the official repo.
+
+### Licensing and copyright
+
+Code original to Laminar Research under `src/` is under the **MIT/X11** license (see per-file headers). Third-party code under `SDK/` and elsewhere keeps its own licenses. If you see missing or conflicting copyright notices in upstream files, that is worth reporting on the **official** project.
+
+### Contributing (upstream workflow)
+
+Contributions to **upstream** XPTools go via GitHub fork and pull request against [X-Plane/xptools](https://github.com/X-Plane/xptools). This **bigtajine** fork may or may not accept PRs depending on how you host it; for changes intended for everyone, upstream is the right destination.
+
+### Top-level layout
+
+| Path | Purpose |
+| --- | --- |
+| `cmake/` | CMake scripts for tools |
+| `src/` | Main source (WED, DSF tools, GUI, etc.) |
+| `test/` | Regression / test inputs |
+| `scripts/` | Packaging and utility scripts |
+| `SDK/` | Bundled SDK / third-party sources used by the build |
+
+### Documentation / contact (upstream)
+
+Additional developer documentation may live under `src/` (tool-specific READMEs). For upstream bug reports and discussion, use Laminar’s **Scenery Tools Bug Database** and channels linked from the [official developer site](http://developer.x-plane.com/).

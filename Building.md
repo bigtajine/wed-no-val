@@ -1,5 +1,7 @@
 # Building XPTools / WorldEditor (WED)
 
+For the **fork overview, changelog summary, and troubleshooting**, read the root **[README.md](README.md)** first. This file focuses on **environment setup**, **CMake/Conan**, and **validation build flags** in detail.
+
 This document covers **building** the X-Plane scenery tools from source. It also explains **this repository as a fork** of upstream [XPTools](https://github.com/X-Plane/xptools), with an optional WorldEditor build that can **skip airport and scenery validation** so you can export after small edits without fixing unrelated legacy errors.
 
 Upstream reference: [Scenery Tools Bug Database](http://developer.x-plane.com/scenery-tools-bug-database/ "Scenery Tools Bug Database").
