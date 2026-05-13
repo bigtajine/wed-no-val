@@ -25,10 +25,111 @@
 #include "WED_GatewayExport.h"
 #include "WED_MetaDataKeys.h"
 
+// Pull GUI stack before WED entity headers so Windows SDK headers (e.g. shldisp.h) see `string` correctly.
+#include "GUI_FormWindow.h"
+
+#include "WED_Airport.h"
+#include "WED_Entity.h"
+#include "WED_FacadePlacement.h"
+#include "WED_ForestPlacement.h"
+#include "WED_Group.h"
+#include "WED_ObjPlacement.h"
+#include "WED_StringPlacement.h"
+
+static bool is_of_class(WED_Thing * who, const char ** classes)
+{
+	while (*classes)
+	{
+		if (who->GetClass() == *classes)
+			return true;
+		++classes;
+	}
+	return false;
+}
+
+static bool has_any_of_class(WED_Thing * who, const char ** classes)
+{
+	if (is_of_class(who, classes))
+		return true;
+	int n, nn = who->CountChildren();
+	for (n = 0; n < nn; ++n)
+		if (has_any_of_class(who->GetNthChild(n), classes))
+			return true;
+	return false;
+}
+
+static const char * k_3d_classes[] = {
+	WED_ObjPlacement::sClass,
+	WED_FacadePlacement::sClass,
+	WED_ForestPlacement::sClass,
+	WED_StringPlacement::sClass,
+	0
+};
+
+bool GatewayExport_has_3d(WED_Airport * who) { return has_any_of_class(who, k_3d_classes); }
+
+bool Enforce_MetaDataGuiLabel(WED_Airport * apt)
+{
+	static const string kGuiLabelKey("gui_label");
+	string has3D(GatewayExport_has_3d(apt) ? "3D" : "2D");
+	bool changed_meta = false;
+	string old_meta;
+
+	if (!apt->ContainsMetaDataKey(kGuiLabelKey))
+		changed_meta = true;
+	else
+		old_meta = apt->GetMetaDataValue(kGuiLabelKey);
+
+	apt->AddMetaDataKey(kGuiLabelKey, has3D);
+
+	if(old_meta != apt->GetMetaDataValue(kGuiLabelKey))
+		changed_meta = true;
+
+	return changed_meta;
+}
+
+bool EnforceRecursive_MetaDataGuiLabel(WED_Thing * thing)
+{
+	WED_Entity * ent = dynamic_cast<WED_Entity *>(thing);
+	if (!ent || ent->GetHidden())
+		return false;
+
+	WED_Airport * apt = dynamic_cast<WED_Airport *>(thing);
+	if (apt)
+	{
+		return Enforce_MetaDataGuiLabel(apt);
+	}
+
+	bool changedMeta = false;
+	if (thing->GetClass() == WED_Group::sClass)
+	{
+		int cc = thing->CountChildren();
+		for (int c = 0; c < cc; ++c)
+		{
+			WED_Thing * child = thing->GetNthChild(c);
+			changedMeta |= EnforceRecursive_MetaDataGuiLabel(child);
+		}
+	}
+	return changedMeta;
+}
+
 #if HAS_GATEWAY
+#include "GUI_Application.h"
+#include "WED_Url.h"
+
+const string WED_get_GW_api_url()
+{
+	string url(gApplication->args.get_value("--gateway_api_url"));
+	if(url.empty())
+		url = WED_URL_GATEWAY "apiv1/";
+	return url;
+}
+#endif
+
+#if HAS_GATEWAY_EXPORT
 
 // MSVC insanity: XWin must come in before ANY part of the IOperation interface or Ben's stupid #define to get file/line numbers on ops hoses the MS headers!
-#include "GUI_FormWindow.h"
+// GUI_FormWindow.h is already included above for the shared GatewayExport_has_3d / metadata helpers.
 #include "WED_MetaDataDefaults.h"
 #include "WED_Menus.h"
 
@@ -111,28 +212,6 @@ enum {
 	gw_comments
 };
 
-static bool is_of_class(WED_Thing * who, const char ** classes)
-{
-	while (*classes)
-	{
-		if (who->GetClass() == *classes)
-			return true;
-		++classes;
-	}
-	return false;
-}
-
-static bool has_any_of_class(WED_Thing * who, const char ** classes)
-{
-	if (is_of_class(who, classes))
-		return true;
-	int n, nn = who->CountChildren();
-	for (n = 0; n < nn; ++n)
-		if (has_any_of_class(who->GetNthChild(n), classes))
-			return true;
-	return false;
-}
-
 
 // ATC classes - the entire flow hierarchy sits below WED_ATCFlow, so we only need that.
 // Nodes are auxilary to WED_TaxiRoute, so the taxi route covers all edges.
@@ -167,16 +246,6 @@ static bool has_roads(WED_Airport* who)
 	return roads.size() > 0;
 }
 
-// We are intentionally IGNORING lin/pol/str and exclusion zones...this is 3-d in the 'user' sense
-// of the term, like, do things stick up.
-const char * k_3d_classes[] = {
-	WED_ObjPlacement::sClass,
-	WED_FacadePlacement::sClass,
-	WED_ForestPlacement::sClass,
-	WED_StringPlacement::sClass,
-	0
-};
-
 const char * k_dsf_classes[] = {
 	WED_ObjPlacement::sClass,
 	WED_FacadePlacement::sClass,
@@ -188,8 +257,6 @@ const char * k_dsf_classes[] = {
 	WED_PolygonPlacement::sClass,
 	0
 };
-
-bool GatewayExport_has_3d(WED_Airport * who) { return has_any_of_class(who, k_3d_classes); }
 
 static bool has_dsf(WED_Airport * who) { return has_any_of_class(who, k_dsf_classes); }
 
@@ -798,57 +865,4 @@ void WED_GatewayExportDialog::TimerFired()
 	}
 }
 
-bool Enforce_MetaDataGuiLabel(WED_Airport * apt)
-{
-	string has3D(GatewayExport_has_3d(apt) ? "3D" : "2D");
-	string name;
-	apt->GetName(name);
-	bool changed_meta = false;
-	string old_meta;
-
-	if (!apt->ContainsMetaDataKey(wed_AddMetaDataLGuiLabel))
-		changed_meta = true;
-	else
-		old_meta = apt->GetMetaDataValue(wed_AddMetaDataLGuiLabel);
-
-	apt->AddMetaDataKey(META_KeyName(wed_AddMetaDataLGuiLabel), has3D);
-
-	if(old_meta != apt->GetMetaDataValue(wed_AddMetaDataLGuiLabel))
-		changed_meta = true;
-
-	return changed_meta;
-}
-
-bool EnforceRecursive_MetaDataGuiLabel(WED_Thing * thing)
-{
-	WED_Entity * ent = dynamic_cast<WED_Entity *>(thing);
-	if (!ent || ent->GetHidden())
-		return false;
-
-	WED_Airport * apt = dynamic_cast<WED_Airport *>(thing);
-	if (apt)
-	{
-		return Enforce_MetaDataGuiLabel(apt);
-	}
-
-	bool changedMeta = false;
-	if (thing->GetClass() == WED_Group::sClass)
-	{
-		int cc = thing->CountChildren();
-		for (int c = 0; c < cc; ++c)
-		{
-			WED_Thing * child = thing->GetNthChild(c);
-			changedMeta |= EnforceRecursive_MetaDataGuiLabel(child);
-		}
-	}
-	return changedMeta;
-}
-
-const string WED_get_GW_api_url()
-{
-	string url(gApplication->args.get_value("--gateway_api_url"));
-	if(url.empty())
-		url = WED_URL_GATEWAY "apiv1/";
-	return url;
-}
-#endif /* HAS_GATEWAY */
+#endif /* HAS_GATEWAY_EXPORT */

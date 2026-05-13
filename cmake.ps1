@@ -7,7 +7,9 @@ param(
     [string]$BuildType = "Release",
     [string]$ConanProfile = "default",
     [switch]$Clean = $false,
-    [switch]$Verbose = $false
+    [switch]$Verbose = $false,
+    [switch]$NoValidation = $false,
+    [switch]$NoGateway = $false
 )
 
 # Script configuration
@@ -146,6 +148,15 @@ function Invoke-CMakeGenerate {
             "-DCMAKE_BUILD_TYPE=$BuildType",
             "-DCMAKE_TOOLCHAIN_FILE=build/generators/conan_toolchain.cmake"
         )
+
+        if ($NoValidation) {
+            $cmakeArgs += "-DWED_NO_VALIDATION=ON"
+            Write-Info "CMake: WED_NO_VALIDATION=ON (validation bypassed in this build)"
+        }
+        if ($NoGateway) {
+            $cmakeArgs += "-DWED_NO_GATEWAY=ON"
+            Write-Info "CMake: WED_NO_GATEWAY=ON (Gateway export target and pack-upload UI removed; import unchanged)"
+        }
 
         if ($Verbose) {
             $cmakeArgs += "--verbose"

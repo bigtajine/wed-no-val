@@ -36,7 +36,7 @@ enum {
 	wed_ImportApt,
 	wed_ExportApt,
 	wed_ExportPack,
-#if HAS_GATEWAY
+#if HAS_GATEWAY && HAS_GATEWAY_EXPORT
 	wed_ExportToGateway,
 #endif
 	wed_ImportDSF,

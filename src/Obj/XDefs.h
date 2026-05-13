@@ -73,7 +73,10 @@
 
 // These turn on the features to import the global apt databaes for the purpose of building a final scenery pack
 // from the gateway.  You don't need this. Be aware that temp files after gateway import will NOT be removed if activated.
+// CMake may define this to 0 (see WED_NO_GATEWAY in cmake/WED.cmake).
+#ifndef GATEWAY_IMPORT_FEATURES
 #define GATEWAY_IMPORT_FEATURES 1
+#endif
 
 // no validation upon export, but special heuristics for agp expansion before export. Also seyt GATEWAY_IMPORT_FEATURES to
 // be able to get the gateway extracts INTO WED.
@@ -88,8 +91,20 @@
 // Set this to 1 to replace vector with a version that checks bounds.  Usually only used to catch fugly bugs.
 #define SAFE_VECTORS 0
 
-// This enables gateway communication.  You can turn this off if you don't have a working CURL/SSL.
+// This enables gateway communication (import UI, API base URL, etc.).  You can turn this off if you don't have a working CURL/SSL.
+#ifndef HAS_GATEWAY
 #define HAS_GATEWAY 1
+#endif
+
+// Submit-to-Gateway, "Airport Scenery Gateway" export target, and upload dialog. Independent of import:
+// CMake WED_NO_GATEWAY=ON forces this off via WED_NoGatewayOverrides.h (see cmake/WED.cmake).
+#ifndef HAS_GATEWAY_EXPORT
+#if HAS_GATEWAY
+#define HAS_GATEWAY_EXPORT 1
+#else
+#define HAS_GATEWAY_EXPORT 0
+#endif
+#endif
 
 // This enables curved ATC taxiways - feature is NOT done yet or offical so, like, don't use it.
 #define HAS_CURVED_ATC_ROUTE 0

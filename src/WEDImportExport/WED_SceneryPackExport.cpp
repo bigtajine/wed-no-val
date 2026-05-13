@@ -674,7 +674,7 @@ static void	DoHueristicAnalysisAndAutoUpgrade(IResolver* resolver)
 				LOG_MSG("I/XP12 Deleted Always Flatten at %s\n", ICAO_code.c_str());
 			}
 			// get the 3D meta tag right
-			if (gExportTarget == wet_gateway || TYLER_MODE)
+			if ((gExportTarget == wet_gateway && HAS_GATEWAY_EXPORT) || TYLER_MODE)
 			{
 				Enforce_MetaDataGuiLabel(*apt_itr);
 			}
@@ -740,7 +740,7 @@ static void	DoHueristicAnalysisAndAutoUpgrade(IResolver* resolver)
 
 int		WED_CanExportPack(IResolver* resolver, string& ioname)
 {
-	if (gExportTarget == wet_gateway)
+	if (gExportTarget == wet_gateway && HAS_GATEWAY_EXPORT)
 		ioname = "Export to Scenery (w/Scenery Gateway heuristics)";
 	else
 		 ioname = string("Export to Scenery for ") + WED_GetTargetMenuName(gExportTarget - wet_xplane_900);
@@ -760,7 +760,7 @@ void	WED_DoExportPack(WED_Document * resolver, WED_MapPane * pane)
 		return;
 
 	auto uMgr = resolver->GetUndoMgr();
-	if (gExportTarget == wet_gateway)
+	if (gExportTarget == wet_gateway && HAS_GATEWAY_EXPORT)
 	{
 		uMgr->MarkUndo();
 		DoHueristicAnalysisAndAutoUpgrade(resolver);
@@ -778,7 +778,7 @@ void	WED_DoExportPack(WED_Document * resolver, WED_MapPane * pane)
 	WED_ExportPackToPath(g, resolver, pack_base, problem_children);
 
 #if !TYLER_MODE
-	if (gExportTarget == wet_gateway)
+	if (gExportTarget == wet_gateway && HAS_GATEWAY_EXPORT)
 	{
 		if (uMgr->UndoToMark())
 			DoUserAlert("Some of the upgrade heuristics applied during export could not be undone. Scenery was permanently altered by export.");

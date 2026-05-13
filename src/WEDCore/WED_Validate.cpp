@@ -112,6 +112,9 @@
 // Checks for zero length sides - can be turned off for grandfathered airports.
 #define CHECK_ZERO_LENGTH 1
 
+/* True only when exporting/submitting to Gateway is enabled and the user picked that target. */
+#define WED_GATEWAY_EXPORT_STRICT ((gExportTarget) == wet_gateway && HAS_GATEWAY_EXPORT)
+
 #define DBG_LIN_COLOR 1,0,1,1,0,1
 
 static int strlen_utf8(const string& str)
@@ -319,7 +322,7 @@ static void ValidateOnePointSequence(WED_Thing* who, validation_error_vector& ms
 
 #if CHECK_ZERO_LENGTH
 	double min_seg_len   = 0.1;
-	if (gExportTarget == wet_gateway)
+	if (WED_GATEWAY_EXPORT_STRICT)
 	{
 		if (parent->GetClass() == WED_AirportBoundary::sClass)
 			min_seg_len = 30.0;
@@ -462,7 +465,7 @@ static void ValidateOneFacadePlacement(WED_Thing* who, validation_error_vector& 
 				sprintf(c, "Facade height not close to actual supported heights. Closest supported are %.0f, %.0f", next_h_down, next_h_up);
 			else
 				sprintf(c, "Facade height not close to actual supported heights. Closest supported is %.0f", dist_up < dist_dn ? next_h_up : next_h_down);
-			msgs.push_back(validation_error_t(c, gExportTarget == wet_gateway ? warn_facade_height : warn_facade_height, who, apt));  // only warn for now
+			msgs.push_back(validation_error_t(c, WED_GATEWAY_EXPORT_STRICT ? warn_facade_height : warn_facade_height, who, apt));  // only warn for now
 		}
 	}
 
@@ -630,7 +633,7 @@ static void ValidateDSFRecursive(WED_Thing * who, WED_LibraryMgr* lib_mgr, valid
 		xcl->GetExclusions(ex);
 		if (ex.count(exclude_For))
 			msgs.push_back(validation_error_t("Exclusion Polygons do not (yet) supported forests in X-Plane. Use Exclusion zones instead.", 
-				gExportTarget == wet_gateway ? err_exclusion_polys_no_forests : warn_exclusion_polys_no_forests, who, parent_apt));
+				WED_GATEWAY_EXPORT_STRICT ? err_exclusion_polys_no_forests : warn_exclusion_polys_no_forests, who, parent_apt));
 	}
 	else if(who->GetClass() == WED_ObjPlacement::sClass)
 	{
@@ -645,7 +648,7 @@ static void ValidateDSFRecursive(WED_Thing * who, WED_LibraryMgr* lib_mgr, valid
 			else
 				snprintf(hgt_str, sizeof(hgt_str), "set_%s=%.1lfm", t == 1 ? "MSL" : "AGL", hgt);
 
-			if (gExportTarget == wet_gateway)
+			if (WED_GATEWAY_EXPORT_STRICT)
 			{
 				if (t == 2) // don't warn about set_AGL if the .agp has scrapers
 				{
@@ -675,7 +678,7 @@ static void ValidateDSFRecursive(WED_Thing * who, WED_LibraryMgr* lib_mgr, valid
 
 			if (t == 2 && (hgt < -100.0 || hgt > 100.0))
 				msgs.push_back(validation_error_t(string(hgt_str) + " is more than +/-100m.",
-					(gExportTarget == wet_gateway) ? err_object_custom_elev : warn_object_custom_elev, who, parent_apt));
+					(WED_GATEWAY_EXPORT_STRICT) ? err_object_custom_elev : warn_object_custom_elev, who, parent_apt));
 			else
 				if (hgt < -1000.0 || hgt > 10000.0)
 					msgs.push_back(validation_error_t(string(hgt_str) + " is outside of the -1000 to +10000m rendering engine safe range.",
@@ -685,7 +688,7 @@ static void ValidateDSFRecursive(WED_Thing * who, WED_LibraryMgr* lib_mgr, valid
 
 	if (who->GetClass() != WED_Group::sClass && who->GetClass() != WED_OverlayImage::sClass)
 	{
-		if (gExportTarget == wet_gateway && !parent_apt)
+		if (WED_GATEWAY_EXPORT_STRICT && !parent_apt)
 			msgs.push_back(validation_error_t("Elements of your project are outside the hierarchy of the airport you are trying to export.", err_airport_elements_outside_hierarchy, who, NULL));
 	}
 
@@ -697,7 +700,7 @@ static void ValidateDSFRecursive(WED_Thing * who, WED_LibraryMgr* lib_mgr, valid
 		string res;
 		who_hasRes->GetResource(res);
 
-		if(gExportTarget == wet_gateway)
+		if(WED_GATEWAY_EXPORT_STRICT)
 		{
 			if(!lib_mgr->IsResourceDefault(res))
 				msgs.push_back(validation_error_t(string("The library path '") + res + "' is not part of X-Plane's default installation and cannot be submitted to the global airport database.",
@@ -721,7 +724,7 @@ static void ValidateDSFRecursive(WED_Thing * who, WED_LibraryMgr* lib_mgr, valid
 		else
 			path = lib_mgr->GetResourcePath(res);
 
-		if(!(FILE_exists(path.c_str()) || ( gExportTarget < wet_gateway && res == "::FLATTEN::.pol")))
+		if(!(FILE_exists(path.c_str()) || ( !WED_GATEWAY_EXPORT_STRICT && res == "::FLATTEN::.pol")))
 				msgs.push_back(validation_error_t(string(who->HumanReadableType()) + "'s resource " + res + " cannot be found.", err_resource_cannot_be_found, who, parent_apt));
 
 		//3. What happen if the user free types a real resource of the wrong type into the box?
@@ -911,7 +914,7 @@ static void ValidateOneATCRunwayUse(WED_ATCRunwayUse* use, validation_error_vect
 
 	AptInfo_t ainfo;
 	apt->Export(ainfo);
-    if(gExportTarget == wet_gateway && ainfo.has_atc_twr)
+    if(WED_GATEWAY_EXPORT_STRICT && ainfo.has_atc_twr)
 	if(find(dep_freqs.begin(), dep_freqs.end(), urule.dep_freq) == dep_freqs.end())
 	{
 		msgs.push_back(validation_error_t("ATC runway use departure frequency is not matching any ATC departure frequency defined at this airport.", err_rwy_use_no_matching_dept_freq, use, apt));
@@ -1225,7 +1228,7 @@ static int ValidateOneRampPosition(WED_RampPosition* ramp, validation_error_vect
 				msgs.push_back(validation_error_t(string("Ramp start airlines string '") + orig_airlines_str + "' is not in groups of three letters.", err_ramp_airlines_is_not_in_groups_of_three, ramp, apt));
 				return is_ai_capable;
 			}
-			if (gExportTarget == wet_gateway && airlines_str.size() > 100)
+			if (WED_GATEWAY_EXPORT_STRICT && airlines_str.size() > 100)
 			{
 				msgs.push_back(validation_error_t(string("Ramp start airlines string '") + orig_airlines_str + "' is too long.", err_ramp_airlines_too_long, ramp, apt));
 				return is_ai_capable;
@@ -1413,7 +1416,7 @@ static void ValidateOneRunwayOrSealane(WED_Thing* who, validation_error_vector& 
 		}
 		else
 		{
-				auto grievance = gExportTarget == wet_gateway ? err_rwy_misaligned_with_name : warn_rwy_misaligned_with_name;
+				auto grievance = WED_GATEWAY_EXPORT_STRICT ? err_rwy_misaligned_with_name : warn_rwy_misaligned_with_name;
 
 				double true_heading, len;
 				Point2 ctr;
@@ -1445,7 +1448,7 @@ static void ValidateOneRunwayOrSealane(WED_Thing* who, validation_error_vector& 
 	{
 		if (rwy->GetSurface() == surf_Water)
 			msgs.push_back(validation_error_t("Water is no valid surface type for runways.", err_rwy_surface_water_not_valid, who, apt));
-		if (gExportTarget == wet_gateway && rwy->GetSurface() == surf_Trans)
+		if (WED_GATEWAY_EXPORT_STRICT && rwy->GetSurface() == surf_Trans)
 			msgs.push_back(validation_error_t("Transparent runways are not allowed on the Scenery Gateway.", err_rwy_surface_water_not_valid, who, apt));
 		if (rwy->GetDisp1() + rwy->GetDisp2() > rwy->GetLength())
 			msgs.push_back(validation_error_t(string("The runway '") + name + "' has overlapping displaced thresholds.", err_rwy_overlapping_displaced_thresholds, who, apt));
@@ -2021,7 +2024,7 @@ static void ValidateAirportMetadata(WED_Airport* who, validation_error_vector& m
 			msgs.push_back(validation_error_t(txt + " must be either '2D' or '3D'", err_airport_metadata_invalid, who, apt));
 	}
 
-	if(gExportTarget >= wet_xplane_1130 && gExportTarget != wet_gateway)   // For the gateway target - the gui_label tags are forced prior to export, anyways.
+	if(gExportTarget >= wet_xplane_1130 && !WED_GATEWAY_EXPORT_STRICT)   // For the gateway target - the gui_label tags are forced prior to export, anyways.
 	{                                                                      // So don't bother the user with this detail or force him to set it 'right'
 		if(who->ContainsMetaDataKey(wed_AddMetaDataLGuiLabel))
 		{
@@ -2133,7 +2136,7 @@ static void ValidateOneTruckParking(WED_TruckParkingLocation* truck_parking, WED
 	}
 	AptTruckParking_t park;
 	truck_parking->Export(park);
-	if (gExportTarget >= wet_gateway)
+	if (WED_GATEWAY_EXPORT_STRICT)
 	{
 		if(park.vpath.size())
 			msgs.push_back(validation_error_t("Custom Trucks are not allowed on the gateway", err_truck_custom, truck_parking, apt));
@@ -2355,7 +2358,7 @@ static void ValidateAptName(const string name, const string icao, validation_err
 		msgs.push_back(validation_error_t("Airport has no name.", err_airport_name, apt, apt));
 	else
 	{
-		validate_error_t err_type = gExportTarget == wet_gateway ? err_airport_name : warn_airport_name_style;
+		validate_error_t err_type = WED_GATEWAY_EXPORT_STRICT ? err_airport_name : warn_airport_name_style;
 
 		if (strlen_utf8(name) > 30)
 			msgs.push_back(validation_error_t(string("Airport name '") + name + "' is longer than 30 characters.", err_type, apt, apt));
@@ -2451,12 +2454,12 @@ static void ValidateRoads(const vector<WED_RoadEdge *> roads, validation_error_v
 			if(near_but_not_on_boundary(s.p2))
 				msgs.push_back(validation_error_t("Road nodes must be either exactly on or a few meters away from DSF tile boundaries.", err_net_crosses_tile_bdy, r, apt));
 
-			if (gExportTarget >= wet_gateway)
+			if (WED_GATEWAY_EXPORT_STRICT)
 				if (!roads_bbox.contains(s.as_segment()))
 					roads_outside.insert(r);
 		}
 
-		if(gExportTarget >= wet_gateway)
+		if(WED_GATEWAY_EXPORT_STRICT)
 		{
 #if 0
 			msgs.push_back(validation_error_t("Roads networks are not (yet) allowed on the gateway", err_net_resource, roads, apt));
@@ -2718,7 +2721,7 @@ static void ValidateOneAirport(WED_Airport* apt, validation_error_vector& msgs, 
 
 	ValidateAptName(name, icao, msgs, apt);
 
-	validate_error_t err_type = gExportTarget == wet_gateway ? err_airport_no_rwys_sealanes_or_helipads : warn_airport_no_rwys_sealanes_or_helipads;
+	validate_error_t err_type = WED_GATEWAY_EXPORT_STRICT ? err_airport_no_rwys_sealanes_or_helipads : warn_airport_no_rwys_sealanes_or_helipads;
 	switch(apt->GetAirportType())
 	{
 		case type_Airport:
@@ -2832,7 +2835,7 @@ static void ValidateOneAirport(WED_Airport* apt, validation_error_vector& msgs, 
 	}
 
 
-	err_type = gExportTarget == wet_gateway ? err_airport_impossible_size : warn_airport_impossible_size;
+	err_type = WED_GATEWAY_EXPORT_STRICT ? err_airport_impossible_size : warn_airport_impossible_size;
 	Bbox2 bounds;
 	apt->GetBounds(gis_Geo, bounds);
 	int lg_apt_mult = ((icao == "KEDW" || icao == "KSEA") ? 3.0 : 1.0);  // runways on all surrounding salt flats included or space needle
@@ -2848,7 +2851,7 @@ static void ValidateOneAirport(WED_Airport* apt, validation_error_vector& msgs, 
 	if(GT_routes.size() && truck_parking_locs.empty())
 		msgs.push_back(validation_error_t("Ground routes are defined, but no service vehicle starts. This disables all ground traffic, including auto generated pushback vehicles.", warn_truckroutes_but_no_starts, apt,apt));
 
-	if(gExportTarget == wet_gateway)
+	if(WED_GATEWAY_EXPORT_STRICT)
 	{
 		if(!runways.empty() && boundaries.empty())
             msgs.push_back(validation_error_t("This airport contains runway(s) but no airport boundary.", 	err_airport_no_boundary, apt,apt));
@@ -3021,7 +3024,7 @@ validation_result_t	WED_ValidateApt(WED_Document * resolver, WED_MapPane * pane,
 
 	// get data about runways from CIFP data
 	MFMemFile * mf = nullptr;
-	if(gExportTarget == wet_gateway)
+	if(WED_GATEWAY_EXPORT_STRICT)
 		mf = ReadCIFP();
 
 #if 0 // DEV

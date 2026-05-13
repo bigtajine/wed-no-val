@@ -645,7 +645,11 @@ void WED_GatewayImportDialog::TimerFired()
 
 						//Set the current airport in the sense of "WED's current airport"
 						WED_SetCurrentAirport(mResolver, last_imported);
+#if HAS_GATEWAY_EXPORT
 						gExportTarget = wet_gateway;
+#else
+						gExportTarget = wet_latest_xplane;
+#endif
 						//Select the current airport in the sense of selecting something on the map pane
 						ISelection * sel = WED_GetSelect(mResolver);
 						sel->Clear();

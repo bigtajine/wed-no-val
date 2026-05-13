@@ -45,13 +45,25 @@ if [[ ! -f build/generators/conan_toolchain.cmake ]]; then
 fi
 
 echo "Configuring CMake in ${BUILD_DIR}..."
+CMAKE_EXTRA_ARGS=()
+if [[ "${WED_NO_VALIDATION:-}" == "1" ]]; then
+	CMAKE_EXTRA_ARGS+=(-DWED_NO_VALIDATION=ON)
+	echo "WED_NO_VALIDATION=ON (from env)"
+fi
+if [[ "${WED_NO_GATEWAY:-}" == "1" ]]; then
+	CMAKE_EXTRA_ARGS+=(-DWED_NO_GATEWAY=ON)
+	echo "WED_NO_GATEWAY=ON (from env)"
+fi
+
 cmake .. \
 	-G "${GENERATOR}" \
 	"-DCMAKE_BUILD_TYPE=${BUILD_TYPE}" \
-	-DCMAKE_TOOLCHAIN_FILE=build/generators/conan_toolchain.cmake
+	-DCMAKE_TOOLCHAIN_FILE=build/generators/conan_toolchain.cmake \
+	"${CMAKE_EXTRA_ARGS[@]}"
 
 popd >/dev/null
 
 echo "Done. Build with:"
 echo "  cmake --build ${BUILD_DIR} --config ${BUILD_TYPE}"
 echo "(Use --config for multi-config generators like Xcode or Visual Studio.)"
+echo "Optional: export WED_NO_VALIDATION=1 and/or WED_NO_GATEWAY=1 before running this script to pass -DWED_NO_VALIDATION=ON / -DWED_NO_GATEWAY=ON into CMake configure."

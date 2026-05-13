@@ -24,20 +24,24 @@
 #ifndef WED_GatewayExport_H
 #define WED_GatewayExport_H
 
-#if HAS_GATEWAY
-class	IResolver;
-class	WED_Document;
-class WED_Thing;
 class WED_Airport;
+class WED_Thing;
 
-int		WED_CanExportToGateway(IResolver * resolver);
-void	WED_DoExportToGateway(WED_Document * resolver);
-
+// Used by validation / metadata checks even when gateway upload is disabled.
 bool GatewayExport_has_3d(WED_Airport * who);
 bool Enforce_MetaDataGuiLabel(WED_Airport * apt);
 bool EnforceRecursive_MetaDataGuiLabel(WED_Thing * thing);
 
+#if HAS_GATEWAY
+class	IResolver;
+class	WED_Document;
+
 const string WED_get_GW_api_url();
+
+#if HAS_GATEWAY_EXPORT
+int		WED_CanExportToGateway(IResolver * resolver);
+void	WED_DoExportToGateway(WED_Document * resolver);
+#endif
 
 #endif
 

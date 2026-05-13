@@ -274,7 +274,11 @@ void	WED_DoImportExtracts(IResolver * resolver)
             LOG_MSG("%s %5d %5.1lf%%\n", nam.c_str(), cnt, 100.0 * cnt / tot);
         }
 		wrl->CommitOperation();
+#if HAS_GATEWAY_EXPORT
 		gExportTarget = wet_gateway;
+#else
+		gExportTarget = wet_latest_xplane;
+#endif
 	}
 }
 

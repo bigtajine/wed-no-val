@@ -57,7 +57,7 @@ static const GUI_MenuItem_t	kFileMenu[] = {
 {	"Import Ortho&photo...", 0,		0,								0,	wed_ImportOrtho		},
 {	"Import Digital Elevation Raster...", 0, 0,						0,	wed_ImportDem		},
 {	"Export Scenery Pac&k",	'B',	gui_ControlFlag,				0,	wed_ExportPack		},
-#if HAS_GATEWAY
+#if HAS_GATEWAY_EXPORT
 {	"Submit to Airport Scenery Gateway...",0,	0,					0,	wed_ExportToGateway	},
 #endif
 {	"Advanced ...",			0,		0,								0,	0					},
@@ -79,13 +79,20 @@ static const GUI_MenuItem_t kExportTargetMenu[] = {
 {	"X-Plane 11.30",		0,		0,								0,	wed_Export1130,		},
 {	"X-Plane 12.00",		0,		0,								0,	wed_Export1200,		},
 {	"X-Plane 12.1.2",		0,		0,								0,	wed_Export1212,		},
+#if HAS_GATEWAY_EXPORT
 {	"Airport Scenery Gateway",0,	0,								0,	wed_ExportGateway	},
+#endif
 {	NULL,					0,		0,								0,	0					}
 };
 
 string WED_GetTargetMenuName(int target)
 {
-	if (target >= 0 && target <= wed_ExportGateway - wed_Export900)
+#if HAS_GATEWAY_EXPORT
+	const int kExportTargetLast = wed_ExportGateway - wed_Export900;
+#else
+	const int kExportTargetLast = wed_Export1212 - wed_Export900;
+#endif
+	if (target >= 0 && target <= kExportTargetLast)
 		return kExportTargetMenu[target].name;
 	else
 		return string();
@@ -311,7 +318,7 @@ void WED_MakeMenus(GUI_Application * inApp)
 		"Target X-Plane Version", kExportTargetMenu, file_menu, 9);
 
 	GUI_Menu advanced_menu = inApp->CreateMenu(
-		"Advanced ...", kAdvancedMenu, file_menu, 14 + 2 * HAS_GATEWAY + ROAD_EDITING );
+		"Advanced ...", kAdvancedMenu, file_menu, 14 + HAS_GATEWAY + HAS_GATEWAY_EXPORT + ROAD_EDITING );
 
 	GUI_Menu edit_menu = inApp->CreateMenu(
 		"&Edit", kEditMenu, inApp->GetMenuBar(), 0);

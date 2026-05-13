@@ -2,7 +2,7 @@
 
 For the **fork overview, changelog summary, and troubleshooting**, read the root **[README.md](README.md)** first. This file focuses on **environment setup**, **CMake/Conan**, and **validation build flags** in detail.
 
-This document covers **building** the X-Plane scenery tools from source. It also explains **this repository as a fork** of upstream [XPTools](https://github.com/X-Plane/xptools), with an optional WorldEditor build that can **skip airport and scenery validation** so you can export after small edits without fixing unrelated legacy errors.
+This document covers **building** the X-Plane scenery tools from source. It also explains **this repository as a fork** of upstream [XPTools](https://github.com/X-Plane/xptools), with optional WorldEditor builds that can **skip airport and scenery validation** (`WED_NO_VALIDATION`) and/or **omit the Gateway export target and pack-upload UI** (`WED_NO_GATEWAY`) while **keeping import from Gateway**—for clearly scoped binaries.
 
 Upstream reference: [Scenery Tools Bug Database](http://developer.x-plane.com/scenery-tools-bug-database/ "Scenery Tools Bug Database").
 
@@ -26,18 +26,18 @@ Upstream reference: [Scenery Tools Bug Database](http://developer.x-plane.com/sc
   - [Windows](#windows-1)
   - [Linux and macOS](#linux-and-macos)
   - [Building the binaries](#building-the-binaries)
-  - [CMake options (including validation)](#cmake-options-including-validation)
+  - [CMake options (validation and Gateway)](#cmake-options-validation-and-gateway)
 
 ---
 
 ## About this fork
 
-This tree is a **fork** of Laminar’s open-source scenery tools. The main goal is **not** to replace official WED for Gateway submissions or “first-class” airport work, but to support a practical workflow stock WED makes painful:
+This tree is a **fork** of Laminar’s open-source scenery tools. The main goal is **not** to replace official WED for full airport QA or ecosystem publication workflows, but to support a practical workflow stock WED makes painful:
 
 - You open **third-party or older** scenery that **used to export**, but under **today’s stricter rules** it fails validation (draped polygons, taxi network, winding, “airport impossibly large,” and dozens of other checks).
 - You only want to do **small, local edits**—for example **delete or move a few objects**—and **re-export**, without spending hours fixing **unrelated** errors across the whole airport.
 
-Stock WED intentionally ties **export** to passing validation, to keep scenery quality high in the ecosystem. This fork adds a **compile-time** escape hatch: build with **`WED_NO_VALIDATION=ON`** so `WED_ValidateApt` effectively **always succeeds** (see `src/WEDCore/WED_Validate.cpp`). You choose at **build** time whether your binary behaves like upstream or like this fork’s “no-val” variant.
+Stock WED intentionally ties **export** to passing validation, to keep scenery quality high in the ecosystem. This fork adds a **compile-time** escape hatch: build with **`WED_NO_VALIDATION=ON`** so `WED_ValidateApt` effectively **always succeeds** (see `src/WEDCore/WED_Validate.cpp`). For binaries that must not include the **Gateway export target** or **pack-upload UI**, add **`WED_NO_GATEWAY=ON`** (see `cmake/WED.cmake` and `src/Obj/WED_NoGatewayOverrides.h`). You choose at **build** time how the binary behaves.
 
 ---
 
@@ -46,7 +46,7 @@ Stock WED intentionally ties **export** to passing validation, to keep scenery q
 Designers have discussed this for years on X-Plane.org—for example [“Why do I always get Validation Errors when editing in WED?”](https://forums.x-plane.org/forums/topic/194923-wed-how-to-ignore-deal-with-warnings/) (Scenery Development Forum). Common themes from that thread and related posts:
 
 - **Rules tightened over time.** An airport that exported in an older WED / older export target may **fail today** even if you change almost nothing.
-- **Legitimate fixes exist** (splitting taxi crossings, merging nodes, fixing Bezier self-intersections near nodes, cleaning duplicate vertices, correcting hierarchy so items are not under the wrong airport, and so on). Those are still the **right** fix if you care about ATC/taxi behavior and Gateway acceptance.
+- **Legitimate fixes exist** (splitting taxi crossings, merging nodes, fixing Bezier self-intersections near nodes, cleaning duplicate vertices, correcting hierarchy so items are not under the wrong airport, and so on). Those are still the **right** fix if you care about ATC/taxi behavior and **ecosystem compatibility**.
 - **There is no official “ignore all errors” export switch** in stock WED; frustration is especially high when your edit has **nothing to do** with the failing checks (e.g. you only removed an object or tweaked parking).
 
 This fork’s **optional** no-validation build is aimed squarely at that last situation: **fast, surgical edits** on messy packages where you accept responsibility for the result.
@@ -62,7 +62,7 @@ With **`WED_NO_VALIDATION=ON`**:
 
 **You should still use stock WED** (or a build with validation **on**) when:
 
-- Submitting to the **Airport Scenery Gateway**.
+- Doing **official airport publication** work where ecosystem rules matter.
 - You want WED to **catch mistakes** before they show up in the sim.
 - You are doing serious **taxi / ATC** work and need the errors as guidance.
 
@@ -75,6 +75,7 @@ With **`WED_NO_VALIDATION=ON`**:
 ### Validation / packaging
 
 - **Optional compile-time validation bypass:** CMake option **`WED_NO_VALIDATION`** in `cmake/WED.cmake`. When `ON`, `WED_ValidateApt` returns success immediately (`#if WED_NO_VALIDATION` in `src/WEDCore/WED_Validate.cpp`), so export is not held hostage by unrelated validation failures.
+- **Optional Gateway export–free build:** CMake option **`WED_NO_GATEWAY`** in `cmake/WED.cmake`. When `ON`, MSVC and GCC get a **second forced include** after `XDefs.h` (`src/Obj/WED_NoGatewayOverrides.h`) so **`HAS_GATEWAY_EXPORT`** is reliably **0** in every translation unit. The binary omits the **Airport Scenery Gateway** export target and **pack-upload** UI—**import from Gateway is unchanged** (`HAS_GATEWAY` / `GATEWAY_IMPORT_FEATURES` stay on). **HTTP downloads** (file cache, slippy map, metadata CSV) still use libcurl via `curl_http`.
 - **Versioning and credits:** `src/WEDCore/WED_Version.h` set to **2.6.1-no-val**; maintainer string **bigtajine** surfaced in About, startup, `WED.rc` (Windows Comments), and `WED_Info.plist` (macOS bundle text).
 
 ### Editor performance / responsiveness (optimizations)
@@ -187,17 +188,18 @@ Example:
 
     cmake --build vs_build --config Release --target WED DDSTool
 
-### CMake options (including validation)
+### CMake options (validation and Gateway)
 
 Pass these on the **first** CMake configure (or re-run CMake in your build directory with `-D...`):
 
-- **`-DWED_NO_VALIDATION=OFF`** (default in this tree’s `cmake/WED.cmake`) — full airport/scenery validation in `WED_ValidateApt` (Validate menu and pre-export checks run like upstream).
+- **`-DWED_NO_VALIDATION=OFF`** (default in `cmake/WED.cmake`) — full airport/scenery validation in `WED_ValidateApt` (Validate menu and pre-export checks run like upstream).
 - **`-DWED_NO_VALIDATION=ON`** — validation is compiled out; **use only when you understand the tradeoffs** ([What "no validation" means](#what-no-validation-means-and-what-you-risk)).
+- **`-DWED_NO_GATEWAY=ON`** — forces **`HAS_GATEWAY_EXPORT=0`** via **`src/Obj/WED_NoGatewayOverrides.h`** included immediately after `XDefs.h` on every WED translation unit (MSVC `ForcedIncludeFiles`; GCC `-include`). Removes the **Gateway** export target and **pack-upload** UI; **import from Gateway remains**. Pair with **`WED_NO_VALIDATION=ON`** for the fork’s typical **no-val** release profile. For **official publication** workflows, use **stock upstream WED** from [X-Plane/xptools](https://github.com/X-Plane/xptools)—not this fork’s documentation.
 
-Example after `cmake.ps1` (reconfigure in place to disable validation):
+Example after `cmake.ps1` (reconfigure in place):
 
-    cmake -S . -B vs_build -DCMAKE_TOOLCHAIN_FILE=vs_build/build/generators/conan_toolchain.cmake -DWED_NO_VALIDATION=ON
+    cmake -S . -B vs_build -DCMAKE_TOOLCHAIN_FILE=vs_build/build/generators/conan_toolchain.cmake -DWED_NO_VALIDATION=ON -DWED_NO_GATEWAY=ON
 
 Then build again as usual.
 
-For a **side-by-side** setup, use two build directories (for example `vs_build` with validation on and `vs_build_novalid` with `WED_NO_VALIDATION=ON`) so you always know which binary you are launching.
+For a **side-by-side** setup, use two build directories (for example `vs_build` with validation on and `vs_build_novalid` with `WED_NO_VALIDATION=ON` / `WED_NO_GATEWAY=ON`) so you always know which binary you are launching.

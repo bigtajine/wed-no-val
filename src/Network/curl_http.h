@@ -6,8 +6,6 @@
 #ifndef curl_http_H
 #define curl_http_H
 
-#if HAS_GATEWAY
-
 #if !IBM
 #include <pthread.h>
 #endif
@@ -109,6 +107,4 @@ private:
 // Checks a short list of things that might indicate a net connectivity problem.
 bool	UTL_http_is_error_bad_net(int err);
 
-#endif /* HAS_GATEWAY */
-
-#endif /* UTL_http_H */
+#endif /* curl_http_H */

@@ -1,4 +1,5 @@
 option(WED_NO_VALIDATION "Build WED with airport/scenery validation disabled (Validate menu and pre-export checks always pass)" OFF)
+option(WED_NO_GATEWAY "Build WED without Gateway export target or pack-upload UI (import from Gateway unchanged)" OFF)
 
 if (APPLE)
 	find_program(IBTOOL ibtool REQUIRED)
@@ -473,18 +474,28 @@ else()
 	set(WED_NO_VALIDATION_NUM 0)
 endif()
 
-target_compile_definitions(WED PRIVATE
+set(WED_COMPILE_DEFS
 	${BASIC_PLATFORM_DEFINES}
-    USE_JPEG=1
-    USE_TIF=1
-    WED=1
+	USE_JPEG=1
+	USE_TIF=1
+	WED=1
 	WED_NO_VALIDATION=${WED_NO_VALIDATION_NUM}
 )
+
+target_compile_definitions(WED PRIVATE ${WED_COMPILE_DEFS})
 
 if(MSVC)
 	target_compile_options(WED PRIVATE /FI ${CMAKE_SOURCE_DIR}/src/Obj/XDefs.h)
 else()
 	target_compile_options(WED PRIVATE -include ${CMAKE_SOURCE_DIR}/src/Obj/XDefs.h)
+endif()
+
+if(WED_NO_GATEWAY)
+	if(MSVC)
+		target_compile_options(WED PRIVATE "/FI${CMAKE_SOURCE_DIR}/src/Obj/WED_NoGatewayOverrides.h")
+	else()
+		target_compile_options(WED PRIVATE -include "${CMAKE_SOURCE_DIR}/src/Obj/WED_NoGatewayOverrides.h")
+	endif()
 endif()
 
 target_include_directories(WED PRIVATE

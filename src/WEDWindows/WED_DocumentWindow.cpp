@@ -476,7 +476,7 @@ int	WED_DocumentWindow::HandleCommand(int command)
 	case wed_UpdateMetadata:     WED_DoUpdateMetadata(mDocument); return 1;
 	case wed_ExportApt:		WED_DoExportApt(mDocument, mMapPane); return 1;
 	case wed_ExportPack:	WED_DoExportPack(mDocument, mMapPane); return 1;
-#if HAS_GATEWAY
+#if HAS_GATEWAY && HAS_GATEWAY_EXPORT
 	case wed_ExportToGateway:		WED_DoExportToGateway(mDocument); return 1;
 #endif
 	case wed_ImportApt:		WED_DoImportApt(mDocument,mDocument->GetArchive(), mMapPane); return 1;
@@ -509,7 +509,9 @@ int	WED_DocumentWindow::HandleCommand(int command)
 			Refresh();
 		}
 		return 1;
+#if HAS_GATEWAY_EXPORT
 	case wed_ExportGateway:if (gExportTarget != wet_gateway) { gExportTarget = wet_gateway; mDocument->SetDirty(); Refresh(); } return 1;
+#endif
 
 #if WITHNWLINK
 	case wed_ToggleLiveView :
@@ -618,7 +620,7 @@ int	WED_DocumentWindow::CanHandleCommand(int command, string& ioName, int& ioChe
 
 	case wed_ExportApt:		return WED_CanExportApt(mDocument);
 	case wed_ExportPack:	return WED_CanExportPack(mDocument, ioName);
-#if HAS_GATEWAY
+#if HAS_GATEWAY && HAS_GATEWAY_EXPORT
 	case wed_ExportToGateway:	return WED_CanExportToGateway(mDocument);
 #endif
 	case wed_ImportApt:		return WED_CanImportApt(mDocument);
@@ -642,7 +644,9 @@ int	WED_DocumentWindow::CanHandleCommand(int command, string& ioName, int& ioChe
 	case wed_Export1100: case wed_Export1130:
 	case wed_Export1200: case wed_Export1212:
 		ioCheck = (command - wed_Export900) == (gExportTarget - wet_xplane_900); return 1;
+#if HAS_GATEWAY_EXPORT
 	case wed_ExportGateway:ioCheck = gExportTarget == wet_gateway;	return 1;
+#endif
 
 #if WITHNWLINK
 	case wed_ToggleLiveView :
@@ -715,8 +719,13 @@ void	WED_DocumentWindow::ReceiveMessage(
 		gExportTarget = wet_latest_xplane;
 	#else
 		gExportTarget = (WED_Export_Target) mDocument->ReadIntPref("doc/export_target",gExportTarget);
+#if HAS_GATEWAY_EXPORT
 		if (gExportTarget > wet_latest_xplane && gExportTarget != wet_gateway)
 			gExportTarget = wet_latest_xplane;
+#else
+		if (gExportTarget > wet_latest_xplane || gExportTarget == wet_gateway)
+			gExportTarget = wet_latest_xplane;
+#endif
 	#endif
 		XWin::SetFilePath(NULL,mDocument->IsDirty());
 	}

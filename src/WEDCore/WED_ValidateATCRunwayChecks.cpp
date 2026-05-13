@@ -25,6 +25,11 @@
 
 #include <sstream>
 
+#include "WED_Globals.h"
+#include "XDefs.h"
+
+#define WED_GATEWAY_EXPORT_STRICT ((gExportTarget) == wet_gateway && HAS_GATEWAY_EXPORT)
+
 typedef vector<WED_ATCRunwayUse*>  ATCRunwayUseVec_t;
 
 //We're just using WED_GISPoint because old WED and airports
@@ -950,7 +955,7 @@ static void TJunctionCrossingTest(const TaxiRouteInfoVec_t& all_taxiroutes, vali
 	#define STR(s) #s
 	
 	set<WED_TaxiRoute *> crossing_edges, short_edgesAB, short_edgesC, short_edgesDEF, short_edgesT;
-	auto grievance = gExportTarget == wet_gateway ? err_atc_taxi_short : warn_atc_taxi_short;
+	auto grievance = WED_GATEWAY_EXPORT_STRICT ? err_atc_taxi_short : warn_atc_taxi_short;
 
 	for (auto tr_a = all_taxiroutes.cbegin(); tr_a != all_taxiroutes.cend(); ++tr_a)
 	{
@@ -1239,7 +1244,7 @@ void WED_DoATCRunwayChecks(WED_Airport& apt, validation_error_vector& msgs, cons
 	}
 
 	vector<WED_PolygonPlacement *> all_polys;
-	if(gExportTarget == wet_gateway)
+	if(WED_GATEWAY_EXPORT_STRICT)
 		CollectRecursive(&apt,back_inserter(all_polys), WED_PolygonPlacement::sClass);
 
 	if(!all_polys.empty())
