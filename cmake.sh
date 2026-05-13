@@ -1,55 +1,57 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- Configuration ---
-BUILD_DIR="build"
-PROFILE="default"   # Change to your Conan profile name if needed
-BUILD_TYPE="Release" # Or "Debug"
+# Conan 2 + CMake setup (same flow as cmake.ps1 on Windows).
+# Run from the repository root. This installs dependencies and generates
+# build files; run cmake --build afterward (see Building.md).
 
-# --- Determine default generator ---
+BUILD_DIR="${BUILD_DIR:-build}"
+CONAN_PROFILE="${CONAN_PROFILE:-default}"
+BUILD_TYPE="${BUILD_TYPE:-Release}"
+
 OS_NAME="$(uname -s)"
 if [[ "$OS_NAME" == "Darwin" ]]; then
-    DEFAULT_GENERATOR="Xcode"
-else [[ "$OS_NAME" == "Linux" ]];
-    DEFAULT_GENERATOR="Ninja"
+	DEFAULT_GENERATOR="Xcode"
+elif [[ "$OS_NAME" == "Linux" ]]; then
+	DEFAULT_GENERATOR="Ninja"
+else
+	echo "Unsupported OS: $OS_NAME" >&2
+	exit 1
 fi
 
-# Allow override via env var or first CLI argument
 GENERATOR="${GENERATOR:-${1:-$DEFAULT_GENERATOR}}"
+
+command -v conan >/dev/null 2>&1 || { echo "Install Conan 2 (e.g. pip install 'conan>=2,<3') and ensure 'conan' is on PATH." >&2; exit 1; }
+command -v cmake >/dev/null 2>&1 || { echo "Install CMake and ensure 'cmake' is on PATH." >&2; exit 1; }
 
 echo "Using CMake generator: $GENERATOR"
 
 mkdir -p "${BUILD_DIR}"
+pushd "${BUILD_DIR}" >/dev/null
 
-# --- Step 1: Install Conan dependencies ---
-echo "Installing Conan Debug build type dependencies..."
+for bt in Debug Release RelWithDebInfo; do
+	echo "Installing Conan dependencies (build_type=${bt})..."
+	conan install .. \
+		--build=missing \
+		--profile:build="${CONAN_PROFILE}" \
+		--profile:host="${CONAN_PROFILE}" \
+		-s "build_type=${bt}" \
+		--output-folder=.
+done
 
-conan install . \
-    --profile "${PROFILE}" \
-    --build=missing \
-    --output-folder="${BUILD_DIR}" \
-    --settings build_type="Debug"
+if [[ ! -f build/generators/conan_toolchain.cmake ]]; then
+	echo "Expected Conan toolchain at ${BUILD_DIR}/build/generators/conan_toolchain.cmake" >&2
+	exit 1
+fi
 
-echo "Installing Conan RelWithDebInfo build type dependencies..."
-conan install . \
-    --profile "${PROFILE}" \
-    --build=missing \
-    --output-folder="${BUILD_DIR}" \
-    --settings build_type="RelWithDebInfo"
+echo "Configuring CMake in ${BUILD_DIR}..."
+cmake .. \
+	-G "${GENERATOR}" \
+	"-DCMAKE_BUILD_TYPE=${BUILD_TYPE}" \
+	-DCMAKE_TOOLCHAIN_FILE=build/generators/conan_toolchain.cmake
 
-echo "Installing Conan Release build type dependencies..."
-conan install . \
-    --profile "${PROFILE}" \
-    --build=missing \
-    --output-folder="${BUILD_DIR}" \
-    --settings build_type="Release"
+popd >/dev/null
 
-# --- Step 3: Run CMake ---
-echo "Generating project with ${GENERATOR}..."
-cmake -S . -B "${BUILD_DIR}" \
-    -G "${GENERATOR}" \
-    -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-    -DCMAKE_TOOLCHAIN_FILE=${BUILD_DIR}/${BUILD_TYPE}/generators/conan_toolchain.cmake
-
-echo "✅ Project generated in ${BUILD_DIR} using ${GENERATOR}"
-
+echo "Done. Build with:"
+echo "  cmake --build ${BUILD_DIR} --config ${BUILD_TYPE}"
+echo "(Use --config for multi-config generators like Xcode or Visual Studio.)"

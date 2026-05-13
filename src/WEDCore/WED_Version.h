@@ -30,8 +30,11 @@
 // These versions are used in about boxes, resources, info boxes, etc.
 
 #define	WED_VERSION				2.6.1
-#define	WED_VERSION_STRING		"2.6.1"
-#define	WED_VERSION_STRING_SHORT	"2.6"			// omit beta/release number and trailing zero's
+#define	WED_VERSION_STRING		"2.6.1-no-val"
+#define	WED_VERSION_STRING_SHORT	"2.6.1-no-val"	// fork label: validation can be compiled out (see Building.md)
+
+// Shown in About, startup, and Windows file properties (Comments).
+#define	WED_MODS_CREDIT_STRING		"bigtajine"
 
 #define	WED_COPYRIGHT_STRING	"(C) Copyright 2007-2024, Laminar Research."
 

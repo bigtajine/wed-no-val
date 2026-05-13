@@ -1,3 +1,5 @@
+option(WED_NO_VALIDATION "Build WED with airport/scenery validation disabled (Validate menu and pre-export checks always pass)" OFF)
+
 if (APPLE)
 	find_program(IBTOOL ibtool REQUIRED)
 
@@ -465,11 +467,18 @@ else()
 	add_executable(WED ${WED_SOURCES})
 endif()
 
+if(WED_NO_VALIDATION)
+	set(WED_NO_VALIDATION_NUM 1)
+else()
+	set(WED_NO_VALIDATION_NUM 0)
+endif()
+
 target_compile_definitions(WED PRIVATE
 	${BASIC_PLATFORM_DEFINES}
     USE_JPEG=1
     USE_TIF=1
     WED=1
+	WED_NO_VALIDATION=${WED_NO_VALIDATION_NUM}
 )
 
 if(MSVC)

@@ -54,7 +54,7 @@
 	#include <GL/gl.h>
 #endif
 
-#define	MIN_HANDLE_RECURSE_SIZE 20
+#define	MIN_HANDLE_RECURSE_SIZE 26
 #define SNAP_RADIUS 4
 
 const double kRunwayBlend0[4] = { 0.75,		0.0,	0.75,	0.0		};

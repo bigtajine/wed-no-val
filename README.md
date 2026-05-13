@@ -6,6 +6,8 @@ of the Laminar Research scenery creation/editing tools. This does not
 include X-Plane, Plane Maker, or Airfoil Maker.  It does include source to WorldEditor (WED),
 and our global scenery generator RenderFarm, and other tools.
 
+**Fork note (this copy of the repo):** WorldEditor here is maintained as **bigtajine**’s **2.6.1-no-val** fork. The main addition is an **optional build** (`WED_NO_VALIDATION=ON`) that **skips validation** so you can re-export after small edits (for example removing objects) without fixing every legacy error. That is **not** suitable for Gateway-quality work on its own; see **[Building.md](Building.md)** for rationale (including a link to the X-Plane.org discussion on validation), tradeoffs, and a **changelog**.
+
 Contents
 -------------------------------------------------------------------------------
 

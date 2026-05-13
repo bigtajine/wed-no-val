@@ -2997,6 +2997,14 @@ static void ValidateOneAirport(WED_Airport* apt, validation_error_vector& msgs, 
 
 validation_result_t	WED_ValidateApt(WED_Document * resolver, WED_MapPane * pane, WED_Thing * wrl, bool skipErrorDialog, const char * abortMsg)
 {
+#if WED_NO_VALIDATION
+	(void) resolver;
+	(void) pane;
+	(void) wrl;
+	(void) skipErrorDialog;
+	(void) abortMsg;
+	return validation_clean;
+#else
 #if DEBUG_VIS_LINES
 	//Clear the previously drawn lines before every validation
 	gMeshPoints.clear();
@@ -3095,4 +3103,5 @@ validation_result_t	WED_ValidateApt(WED_Document * resolver, WED_MapPane * pane,
 		return warnings_only ? validation_warnings_only : validation_errors;
 	}
 	else return validation_clean;
+#endif
 }

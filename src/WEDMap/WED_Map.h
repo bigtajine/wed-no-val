@@ -72,6 +72,8 @@ private:
 
 			void		DrawVisFor(WED_MapLayer * layer, int current, const Bbox2& bounds, IGISEntity * what, GUI_GraphState * g, ISelection * sel, int depth);
 			void		DrawStrFor(WED_MapLayer * layer, int current, const Bbox2& bounds, IGISEntity * what, bool what_locked, GUI_GraphState * g, ISelection * sel, int depth);
+			// Single DFS when a layer draws both visualization and structure (notably WED_StructureLayer).
+			void		DrawVisStrFor(WED_MapLayer * layer, int current, const Bbox2& bounds, IGISEntity * what, bool what_locked, GUI_GraphState * g, ISelection * sel, int depth, bool activeVis, bool activeStr);
 
 		IGISEntity *	GetGISBase();
 		ISelection *	GetSel();
@@ -93,7 +95,10 @@ private:
 	int				mY_Orig;
 	int				mIsDownCount;
 	int				mIsDownExtraCount;
-	
+
+	// Throttle full-map Refresh on hover-only mouse moves (coordinate overlay).
+	uint64_t		mLastMouseMoveRefreshMs;
+
 	GUI_Button *	mTiltButton[4];
 };
 

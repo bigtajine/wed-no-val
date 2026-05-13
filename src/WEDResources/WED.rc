@@ -168,6 +168,7 @@ BEGIN
 			VALUE "FileVersion",		WED_VERSION_RES
 			VALUE "ProductVersion",		WED_VERSION_RES
 			VALUE "LegalCopyright",		"Copyright 2009, Laminar Research"
+			VALUE "Comments",			WED_MODS_CREDIT_STRING
 			VALUE "ProductName",		"WED"
 		END
 	END

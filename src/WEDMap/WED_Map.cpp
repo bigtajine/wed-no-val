@@ -38,6 +38,7 @@
 #include "IResolver.h"
 #include "GISUtils.h"
 #include "MathUtils.h"
+#include <chrono>
 #include <time.h>
 
 // This is the size that a GIS composite must be to cause us to skip iterating down into it, in pixels.
@@ -47,9 +48,8 @@
 // So we measure the container to make a judgment.
 //
 // Because we have to add the object hang-over slop to our cull decision, the size of cull in screen space
-// is surprisingly big.  In other words, we might pick 20 pixels as the cutoff because we have 1 pixel of
-// airport and 19 pixels of slop.
-#define TOO_SMALL_TO_GO_IN 20.0
+// is surprisingly big.  Slightly larger cutoffs skip deep recursion on huge airports when zoomed out.
+#define TOO_SMALL_TO_GO_IN 26.0
 
 #if APL
 	#include <OpenGL/gl.h>
@@ -60,8 +60,10 @@
 // display Frames Per Second. Will peg CPU/GPU load at 100%, only useable for diaganostic purposes.
 #define SHOW_FPS 0
 
+static constexpr uint64_t kHoverMouseMoveRefreshMs = 50;
+
 WED_Map::WED_Map(IResolver * in_resolver, GUI_Commander * cmdr) : GUI_Commander(cmdr), mResolver(in_resolver), mTool(NULL), mClickLayer(NULL),
-					mIsDownCount(0), mIsDownExtraCount(0)
+					mIsDownCount(0), mIsDownExtraCount(0), mLastMouseMoveRefreshMs(0)
 {
 		int k_reg[4] = { 0, 0, 4, 2 };
 		int k_act[4] = { 0, 0, 4, 2 };
@@ -153,17 +155,27 @@ void		WED_Map::Draw(GUI_GraphState * state)
 
 	vector<WED_MapLayer *>::iterator l;
 	for (l = mLayers.begin(); l != mLayers.end(); ++l)
-	if((*l)->IsVisible())
 	{
-		(*l)->GetCaps(draw_ent_v, draw_ent_s, wants_sel, wants_clicks);
-		if (base && draw_ent_v) DrawVisFor(*l, cur == *l, b_geo, base, state, wants_sel ? sel : NULL, 0);
+		if (!(*l)->IsVisible())
+			continue;
 
-		if(draw_ent_v && (xTilt != 0.0 || yTilt != 0.0))
+		(*l)->GetCaps(draw_ent_v, draw_ent_s, wants_sel, wants_clicks);
+
+		ISelection * sel_pass = wants_sel ? sel : NULL;
+		if (base && draw_ent_v && draw_ent_s)
+			DrawVisStrFor(*l, cur == *l, b_geo, base, false, state, sel_pass, 0, true, true);
+		else
+		{
+			if (base && draw_ent_v)
+				DrawVisFor(*l, cur == *l, b_geo, base, state, sel_pass, 0);
+			if (base && draw_ent_s)
+				DrawStrFor(*l, cur == *l, b_geo, base, false, state, sel_pass, 0);
+		}
+
+		if (draw_ent_v && (xTilt != 0.0 || yTilt != 0.0))
 		{
 			glMatrixMode(GL_PROJECTION);
 			glPushMatrix();
-			//glLoadIdentity();
-			//glOrtho(0,b[1],0,b[3], -1000, 1000);
 			GLfloat m[16] = {
 				1,     0,     1e-4,  0,
 				0,     1,     1e-4,  0,
@@ -176,25 +188,15 @@ void		WED_Map::Draw(GUI_GraphState * state)
 
 		(*l)->DrawVisualization(cur == *l, state);
 
-		if(draw_ent_v && (xTilt != 0.0 || yTilt != 0.0))
+		if (draw_ent_v && (xTilt != 0.0 || yTilt != 0.0))
 		{
 			glMatrixMode(GL_PROJECTION);
 			glPopMatrix();
 			glMatrixMode(GL_MODELVIEW);
 		}
-	}
 
-	for (l = mLayers.begin(); l != mLayers.end(); ++l)
-	if((*l)->IsVisible())
-	{
-		(*l)->GetCaps(draw_ent_v, draw_ent_s, wants_sel, wants_clicks);
-		if (base && draw_ent_s) DrawStrFor(*l, cur == *l, b_geo, base, false, state, wants_sel ? sel : NULL, 0);
 		(*l)->DrawStructure(cur == *l, state);
-	}
 
-	for (l = mLayers.begin(); l != mLayers.end(); ++l)
-	if((*l)->IsVisible())
-	{
 		(*l)->DrawSelected(cur == *l, state);
 	}
 
@@ -420,6 +422,69 @@ void		WED_Map::DrawStrFor(WED_MapLayer * layer, int current, const Bbox2& bounds
 	}
 }
 
+static bool MapCompositeLOD_Vis(const WED_Map * map, IGISEntity * what, int depth)
+{
+	if (depth == 0)
+		return true;
+	Bbox2	on_screen;
+	what->GetBounds(gis_Geo, on_screen);
+	Point2 p1 = map->LLToPixel(on_screen.p1);
+	Point2 p2 = map->LLToPixel(on_screen.p2);
+	Vector2 span(p1,p2);
+
+	return max(span.dx, span.dy) > TOO_SMALL_TO_GO_IN || (p1 == p2);
+}
+
+static bool MapCompositeLOD_Str(const WED_Map * map, IGISEntity * what, int depth)
+{
+	if (depth == 0)
+		return true;
+	Bbox2	on_screen;
+	what->GetBounds(gis_Geo, on_screen);
+
+	return map->PixelSize(on_screen) > TOO_SMALL_TO_GO_IN || on_screen.is_point();
+}
+
+void		WED_Map::DrawVisStrFor(WED_MapLayer * layer, int current, const Bbox2& bounds, IGISEntity * what, bool what_locked, GUI_GraphState * g, ISelection * sel, int depth, bool activeVis, bool activeStr)
+{
+	if(!what->Cull(bounds))	return;
+
+	auto what_ent = dynamic_cast<WED_Entity*>(what);
+	if(!what_ent || !layer->IsVisibleNow(what_ent))	return;
+
+	bool locked_here = what_locked;
+	locked_here |= layer->IsLocked(what_ent);
+
+	const bool is_sel = sel && sel->IsSelected(what);
+
+	bool vis_ok = true;
+	bool str_ok = true;
+	if (activeVis)
+		vis_ok = layer->DrawEntityVisualization(current, what, g, is_sel);
+	if (activeStr)
+		str_ok = layer->DrawEntityStructure(current, what, g, is_sel, locked_here);
+
+	if (what->GetGISClass() != gis_Composite)
+		return;
+
+	IGISComposite * c = SAFE_CAST(IGISComposite, what);
+	if (!c)
+		return;
+
+	const bool vis_lod = MapCompositeLOD_Vis(this, what, depth);
+	const bool str_lod = MapCompositeLOD_Str(this, what, depth);
+
+	const bool vis_child = activeVis && vis_ok && vis_lod;
+	const bool str_child = activeStr && str_ok && str_lod;
+
+	if (!vis_child && !str_child)
+		return;
+
+	const int t = c->GetNumEntities();
+	for (int n = t-1; n >= 0; --n)
+		DrawVisStrFor(layer, current, bounds, c->GetNthEntity(n), locked_here, g, sel, depth+1, vis_child, str_child);
+}
+
 int			WED_Map::MouseDown(int x, int y, int button)
 {
 	if (mIsDownCount++==0)
@@ -482,11 +547,27 @@ void		WED_Map::MouseUp  (int x, int y, int button)
 
 int	WED_Map::MouseMove(int x, int y)
 {
+	(void) x;
+	(void) y;
 	DispatchHandleCommand(wed_autoClosePane); // This displatch in WED_Foumentwindow is fast in discarding the zillions of
 	           // reduandent command we reate here. If it becomes a problem, have DocumentWindow turn this here explicitly on/off.
 
-	Refresh(); // if we had a propper dedicated status bar for the location position text - we wouldn't have to redraw *everything*
-	           // its quite often also causing duplicate redraws - as all functions that change anything Refresh() already.
+	// Full map redraw on every hover move pegs CPU/GPU; tools and drags call Refresh separately.
+	const bool interaction = (mIsDownCount > 0 || mIsDownExtraCount > 0);
+	if (interaction)
+	{
+		Refresh();
+	}
+	else
+	{
+		using namespace std::chrono;
+		const uint64_t now_ms = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+		if (mLastMouseMoveRefreshMs == 0 || now_ms - mLastMouseMoveRefreshMs >= kHoverMouseMoveRefreshMs)
+		{
+			mLastMouseMoveRefreshMs = now_ms;
+			Refresh();
+		}
+	}
 	return 1;
 }
 

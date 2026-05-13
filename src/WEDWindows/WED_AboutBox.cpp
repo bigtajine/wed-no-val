@@ -61,6 +61,7 @@ void		WED_AboutBox::Draw(GUI_GraphState * state)
 
 	const char * main_text[] = {
 		"WorldEditor " WED_VERSION_STRING_SHORT,
+		WED_MODS_CREDIT_STRING,
 		WED_COPYRIGHT_STRING,
 		"",
 		"This software is available under an open license,",
@@ -87,7 +88,7 @@ void		WED_AboutBox::Draw(GUI_GraphState * state)
 		++n;
 	}
 
-	const char * info = "WorldEditor " WED_VERSION_STRING ", compiled on " __DATE__ " " __TIME__
+	const char * info = "WorldEditor " WED_VERSION_STRING ", " WED_MODS_CREDIT_STRING ", compiled on " __DATE__ " " __TIME__
 #if TYLER_MODE
 	" with TYLER_MODE"
 #endif

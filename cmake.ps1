@@ -172,15 +172,15 @@ function Show-CompletionMessage {
     Write-Host "`n" -NoNewline
     Write-Info "Build setup completed successfully!"
     Write-Host "`nNext steps:" -ForegroundColor Cyan
-    Write-Host "  1. Open the generated .sln file in Visual Studio:" -ForegroundColor White
-    Write-Host "     $BuildDir\*.sln" -ForegroundColor Gray
+    Write-Host "  1. Open the generated solution in Visual Studio:" -ForegroundColor White
+    Write-Host "     $BuildDir\xptools.sln" -ForegroundColor Gray
     Write-Host "  2. Or build Debug from command line:" -ForegroundColor White
     Write-Host "     cmake --build $BuildDir --config Debug" -ForegroundColor Gray
     Write-Host "  3. Or build Release from command line:" -ForegroundColor White
     Write-Host "     cmake --build $BuildDir --config Release" -ForegroundColor Gray
     Write-Host "  4. Or use MSBuild directly:" -ForegroundColor White
-    Write-Host "     msbuild $BuildDir\*.sln /p:Configuration=Debug" -ForegroundColor Gray
-    Write-Host "     msbuild $BuildDir\*.sln /p:Configuration=Release" -ForegroundColor Gray
+    Write-Host "     msbuild $BuildDir\xptools.sln /p:Configuration=Debug" -ForegroundColor Gray
+    Write-Host "     msbuild $BuildDir\xptools.sln /p:Configuration=Release" -ForegroundColor Gray
     Write-Host "`nBoth Debug and Release dependencies are now available!" -ForegroundColor Green
 }
 

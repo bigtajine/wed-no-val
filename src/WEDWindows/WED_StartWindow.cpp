@@ -232,6 +232,7 @@ void	WED_StartWindow::Draw(GUI_GraphState * state)
 
 		const char * main_text[] = {
 			"WorldEditor " WED_VERSION_STRING_SHORT,
+			WED_MODS_CREDIT_STRING,
 			WED_COPYRIGHT_STRING,
 			0
 		};
